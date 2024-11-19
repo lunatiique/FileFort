@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from bitarray import bitarray
-from user_creation import create_user
-from cobra import generate_key_128, encode_text, decode_text
+from backend.user_functions import create_user
+from backend.cobra import generate_key_128, encode_text, decode_text
 
 app = Flask(__name__)
 CORS(app)  # Allow cross-origin requests from the React frontend

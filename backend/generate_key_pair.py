@@ -1,5 +1,3 @@
-import sys
-import os
 import random
 import base64
 from key_derivation_function import sponge_hash, bytes_to_int
@@ -48,17 +46,14 @@ def generate_key_pair(key_size):
     private_key = (d, n)
     return public_key, private_key
 
-# Generate a key pair from a password using  KDF
-def generate_key_pair_from_password(password, key_size):
-    # Derive a seed key from the password using the KDF
-    derived_key = sponge_hash(password, key_size // 8)
-
+# Generate a key pair from a password using KDF
+def generate_key_pair_from_password(password, timestamp, key_size):
+    # Derive a key from the seed, which will be used to generate the primes p and q
+    derived_key = sponge_hash(password + timestamp, key_size // 8)
     # Use derived key as a seed to generate primes p and q
     seed_int = bytes_to_int(derived_key)
     p = generate_prime_from_seed(seed_int, key_size // 2)
     q = generate_prime_from_seed(seed_int + 1, key_size // 2)  # Change seed slightly for q
-    print("p: ", p)
-    print("q: ", q)
     # Ensure p and q are distinct
     while p == q:
         seed_int += 1
@@ -121,3 +116,15 @@ def read_key(path):
         key_data = (int.from_bytes(key_data[len(key_data)//2:], byteorder='big'), 
                     int.from_bytes(key_data[:len(key_data)//2], byteorder='big'),)
         return key_data
+    
+# When user wants to login, check if the password is correct by generating the keys and comparing them to the stored keys
+def check_password(name, password, timestamp):
+    # Generate the keys
+    public, private = generate_key_pair_from_password(password, timestamp, 1024)
+    # Read the stored keys
+    stored_private = read_key(f"../users/{name}/private_key.pem")
+    # Compare the generated keys to the stored keys
+    if private == stored_private:
+        return True
+    else:
+        return False
