@@ -1,8 +1,9 @@
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from bitarray import bitarray
-from backend.user_functions import create_user
-from backend.cobra import generate_key_128, encode_text, decode_text
+from user_functions import create_user, login_user
+from cobra import generate_key_128, encode_text, decode_text
 
 app = Flask(__name__)
 CORS(app)  # Allow cross-origin requests from the React frontend
@@ -18,7 +19,12 @@ def api_create_user():
     # Validate input
     if not name or not password:
         return jsonify({"error": "Name and password are required"}), 400
-
+    # Check if the name is already taken
+    if name in os.listdir('../users'):
+        return jsonify({"error": "Username already exists"}), 400
+    # Check if the password is at least 8 characters long and contains a digit
+    if len(password) < 8 or not any(char.isdigit() for char in password):
+        return jsonify({"error": "Password must be at least 8 characters long and contain a digit"}), 400
     try:
         # Call the create_user function
         create_user(name, password)
@@ -26,6 +32,27 @@ def api_create_user():
     except Exception as e:
         if 'WinError 183' in str(e):
             return jsonify({"error": "Username already exists"}), 400
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/login_user', methods=['POST'])
+def api_login_user():
+    # Extract data from the request
+    data = request.get_json()
+    name = data.get('name')
+    password = data.get('password')
+
+    # Validate input
+    if not name or not password:
+        return jsonify({"error": "Name and password are required"}), 400
+
+    try:
+        # Call the login_user function
+        success = login_user(name, password)
+        if success:
+            return jsonify({"message": "Login successful!"}), 200
+        else:
+            return jsonify({"error": "Login failed"}), 401
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/generate_key_128', methods=['GET'])

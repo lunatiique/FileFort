@@ -4,6 +4,8 @@ from generate_key_pair import generate_key_pair_from_password, write_keys_to_fil
 def create_user(name, password):
     #create directory for user in users folder
     os.mkdir(f"../users/{name}")
+    #add data directory for user
+    os.mkdir(f"../users/{name}/data")
     # get timestamp of folder creation
     timestamp = os.stat(f"../users/{name}").st_birthtime  
     # convert the timestamp to a string
