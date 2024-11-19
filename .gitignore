@@ -1,0 +1,6 @@
+# ignore node_modules in frontend
+frontend/node_modules
+# ignore package-lock.json in frontend
+frontend/package-lock.json
+# ignore pycache in backend
+backend/__pycache__
