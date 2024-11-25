@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import Home from './pages/home.js';
 import Encode from './pages/cipher/encode';
 import Login from './pages/user/login';
+import UploadFile from './pages/user/uploadFile';
 
 function App() {
   
@@ -18,6 +19,7 @@ function App() {
           <Route path="/user/register" element={<Register/>} />
           <Route path="/cipher/encode" element={<Encode/>} />
           <Route path="/user/login" element={<Login/>} />
+          <Route path="user/uploadFile" element={<UploadFile/>} />
         </Routes>
       </Layout>
     </Router>

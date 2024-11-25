@@ -10,6 +10,7 @@ function DecodeText() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setLoading(true);
         try {
             const response = await fetch('http://127.0.0.1:5000/api/decode_text', {
                 method: 'POST',
@@ -18,16 +19,13 @@ function DecodeText() {
                 },
                 body: JSON.stringify({ text, key }),
             });
-            // While waiting for the response, the loading state is set to true
-            // When the response is received, the loading state is set to false
-            setLoading(true);
             const data = await response.json();
-            setLoading(false);
             setDecodedText(data.decoded_text);
             setMessage({ type: 'success', content: "Text decoded successfully" });
         } catch (error) {
             setMessage({ type: 'error', content: "An error occurred while decoding the text" });
         }
+        setLoading(false);
     }
 
     return(
@@ -66,7 +64,7 @@ function DecodeText() {
                         readOnly
                     />
                 </Form.Field>
-                <Button type='submit' fluid size='large'>Decode Text</Button>
+                <Button type='submit' fluid size='large' loading={loading}>Decode Text</Button>
             </Form>
             {message && (
                 <Message
@@ -75,13 +73,7 @@ function DecodeText() {
                     style={{ marginTop: '20px' }}
                 />
             )}
-            {loading && (
-                <Message
-                    color='blue'
-                    content='Loading...'
-                    style={{ marginTop: '20px' }}
-                />
-            )}
+
         </div>
 
     )

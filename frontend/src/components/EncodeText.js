@@ -10,6 +10,7 @@ function EncodeText() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setLoading(true);
         try {
             const response = await fetch('http://127.0.0.1:5000/api/encode_text', {
                 method: 'POST',
@@ -18,16 +19,13 @@ function EncodeText() {
                 },
                 body: JSON.stringify({ text, key }),
             });
-            // While waiting for the response, the loading state is set to true
-            // When the response is received, the loading state is set to false
-            setLoading(true);
             const data = await response.json();
-            setLoading(false);
             setEncodedText(data.encoded_text);
             setMessage({ type: 'success', content: "Text encoded successfully" });
         } catch (error) {
             setMessage({ type: 'error', content: "An error occurred while encoding the text" });
         }
+        setLoading(false);
     }
 
     return(
@@ -66,19 +64,12 @@ function EncodeText() {
                         readOnly
                     />
                 </Form.Field>
-                <Button type='submit' fluid size='large'>Encode Text</Button>
+                <Button type='submit' fluid size='large' loading={loading}>Encode Text</Button>
             </Form>
             {message && (
                 <Message
                     color={message.type === 'error' ? 'red' : 'green'}
                     content={message.content}
-                    style={{ marginTop: '20px' }}
-                />
-            )}
-            {loading && (
-                <Message
-                    color='blue'
-                    content='Loading...'
                     style={{ marginTop: '20px' }}
                 />
             )}

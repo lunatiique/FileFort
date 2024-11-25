@@ -4,7 +4,21 @@
     top: 0;
     width: auto;
     z-index: 1000;
+    margin-top : 10px;
 }
+
+.sticky-header-right {
+    position: fixed;
+    top: 0;
+    right: 10%;
+    z-index: 1000;
+    margin-top : 10px;
+    height: 50px;
+}
+
+.ui.menu .item{
+    height:100%;
+} 
 
 .center-image {
     width: 15em;
@@ -32,10 +46,6 @@
     margin-top: 0px;
     font-style: italic;
     font-weight: normal;
-}
-
-.ui.menu .item {
-    height:100%;
 }
 
 .iconImg{

@@ -6,9 +6,11 @@ function GenerateKey() {
 
     const [key, setKey] = useState('');
     const [message, setMessage] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setLoading(true);
         try {
             const response = await fetch('http://127.0.0.1:5000/api/generate_key_128', {
                 method: 'GET',
@@ -22,6 +24,7 @@ function GenerateKey() {
         } catch (error) {
             setMessage({ type: 'error', content: "An error occurred while generating a new key" });
         }
+        setLoading(false);
     }
 
     return (
@@ -39,7 +42,7 @@ function GenerateKey() {
                     />
                 </Form.Field>
 
-                <Button type='submit' fluid size='large'>Generate Key</Button>
+                <Button type='submit' fluid size='large' loading={loading}>Generate Key</Button>
             </Form>
             {message && (
                 <Message
