@@ -22,15 +22,36 @@ def bezout(a,b):
     else:
         u,v=bezout(b,a%b)
         return (v,u-(a//b)*v)
+
+x_eu, y_eu = 0,1 
+
+#extended euclide algorithm 
+def pgcd_extended(a,b):
+    global x_eu, y_eu
+
+    # Base case
+    if a == 0:
+        x_eu = 0
+        y_eu = 1
+        return b
     
+    pgcd = pgcd_extended(b % a, a)
+    x1 = x_eu
+    y1 = y_eu
+
+    x_eu = y1 - (b // a) * x1
+    y_eu = x1
+
+    return pgcd
 
 #extended euclide algorithm to find the inverse of a modulo b
 def inv_mod(a,b):
-    u,v=bezout(a,b)
-    if pgcd(a,b)==1:
-        return u%b
-    else:
+    g = pgcd_extended(a,b)
+    if g!=1:
         return "no inverse"
+    else:
+        res = (x_eu % b + b) % b
+        return res
 
 #eratosthenes algorithm to check if a number is prime
 def eratosthenes(a):

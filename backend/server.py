@@ -1,13 +1,81 @@
 import os
-from flask import Flask, request, jsonify
+import io
+from datetime import datetime
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from bitarray import bitarray
 from user_functions import create_user, login_user
 from cobra import generate_key_128, encode_text, decode_text
+from RSAencrypt import encrypt_file_block, decrypt_file_block
+from generateKeyPair import read_key
+
+def encode_file(public_key, request):
+    # Validate request data
+    if "file" not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    if "name" not in request.form:
+        return jsonify({"error": "No name part"}), 400
+    
+    file = request.files["file"]
+    name = request.form["name"]
+    
+    if file.filename == "":
+        return jsonify({"error": "No selected file"}), 400
+
+    # Define user directory
+    user_path = os.path.join(app.config["UPLOAD_FOLDER"], name, "data")
+    os.makedirs(user_path, exist_ok=True)
+    
+    # Validate public key
+    try:
+        e, n = public_key
+    except ValueError:
+        return jsonify({"error": "Invalid public key format"}), 400
+
+    # Read and encrypt the file
+    encrypted_file_base64 = encrypt_file_block(file, n, e)
+    # Save the encrypted data
+    encrypted_file_path = os.path.join(user_path, f"{file.filename}")
+
+    with open(encrypted_file_path, "w") as f:
+        f.write(encrypted_file_base64)
+
+    return jsonify({"message": "File uploaded and encrypted successfully!"}), 201
+
+def send_file_back(file_name, user, private_key):
+    # Define user directory
+    user_path = os.path.join(app.config["UPLOAD_FOLDER"], user, "data")
+    
+    # Validate private key
+    try:
+        k, n = private_key
+    except ValueError:
+        raise ValueError("Invalid private key format")
+    
+    # Read the encrypted file
+    encrypted_file_path = os.path.join(user_path, f"{file_name}")
+    if not os.path.exists(encrypted_file_path):
+        raise FileNotFoundError(f"Encrypted file {file_name} not found")
+    
+    # Open the file
+    with open(encrypted_file_path, "r") as file:
+        try:
+            decrypted_data = decrypt_file_block(file, n, k)
+        except Exception as e:
+            print(f"Decryption failed: {e}")
+            raise
+
+    # Return decrypted data
+    return decrypted_data
+
+
 
 app = Flask(__name__)
 CORS(app)  # Allow cross-origin requests from the React frontend
 
+UPLOAD_FOLDER = "../users/"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Ensure upload folder exists
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 @app.route('/api/create_user', methods=['POST'])
 def api_create_user():
@@ -110,6 +178,94 @@ def api_decode_text():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/upload", methods=["POST"])
+def upload_file():
+    # read the public_key from the user logged in
+    public_key = read_key(f"../users/{request.form['name']}/public_key.pem")
+    result = encode_file(public_key, request)
+    return result
+
+@app.route('/api/files', methods=['GET'])
+def get_files():
+    user_name = request.headers.get("Authorization")    
+    user_path = os.path.join(app.config["UPLOAD_FOLDER"], user_name, "data")
+    
+    if not os.path.exists(user_path):
+        return jsonify({"error": "User files not found"}), 404
+    
+    files = []
+    
+    # Iterate through the files in the directory
+    for file_name in os.listdir(user_path):
+        file_path = os.path.join(user_path, file_name)
+        
+        # Ensure that we only include files (skip directories)
+        if os.path.isfile(file_path):
+            # Get the creation time (or last modification time)
+            file_creation_time = os.path.getctime(file_path)  # Use getmtime if preferred
+            
+            # Convert the timestamp to a readable date string
+            file_date_added = datetime.fromtimestamp(file_creation_time).isoformat()
+            
+            # Append the file details to the list
+            files.append({
+                "name": file_name,
+                "dateAdded": file_date_added
+            })
+    
+    return jsonify({"files": files}), 200
+
+
+@app.route('/api/files/<file_name>', methods=['GET'])
+def download_file(file_name):
+    # Get the 'Authorization' header and extract the username
+    user_name = request.headers.get('Authorization')
+
+    if user_name is None:
+        return jsonify({"error": "Authorization header missing"}), 400
+    if not file_name:
+        return jsonify({"error": "File name is required"}), 400
+    try:
+        # TODO : read the private key from the user logged in (ask him to give the file ? how can I do this ?)
+        private_key = read_key(f"../users/{user_name}/private_key.pem")
+        decrypted_file = send_file_back(file_name, user_name, private_key)
+        decrypted_file = decrypted_file.replace('\x00', '')
+        # Use io.BytesIO to create a file-like object in memory
+        file_stream = io.BytesIO(decrypted_file.encode('utf-8'))
+        file_stream.seek(0)  # Ensure the stream's pointer is at the beginning
+
+        # Send the in-memory file to the user
+        return send_file(
+            file_stream,
+            as_attachment=True,
+            download_name=file_name,  # Suggests the file name for download
+            mimetype='application/octet-stream'  # Default binary MIME type
+        )
+    except Exception as e:
+        return jsonify({"error": f"Failed to process file: {str(e)}"}), 500
+    
+
+@app.route('/api/files/<file_name>', methods=['DELETE'])
+def delete_file(file_name):
+    user_name = request.headers.get("Authorization")
+    user_path = os.path.join(app.config["UPLOAD_FOLDER"], user_name, "data")
+    
+    if not os.path.exists(user_path):
+        return jsonify({"error": "User files not found"}), 404
+    
+    file_path = os.path.join(user_path, file_name)
+    
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)  # Remove the file
+            return jsonify({"message": "File deleted successfully"}), 200
+        except Exception as e:
+            return jsonify({"error": f"Failed to delete file: {str(e)}"}), 500
+    else:
+        return jsonify({"error": "File not found"}), 404
+
+
 if __name__ == '__main__':
     # Run the app on port 5000
-    app.run(debug=True)
+    #Allow all origins for CORS, allow every computer to access the server
+    app.run(port=5000, host='0.0.0.0')
