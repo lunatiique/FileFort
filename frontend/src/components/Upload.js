@@ -2,11 +2,13 @@ import React, { useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button, Icon, Message, Progress, Segment } from "semantic-ui-react";
 import axios from "axios";
+import { useAuth } from "./UserAuthentification";
 
 const Upload = () => {
   const [file, setFile] = useState(null);
   const [uploadStatus, setUploadStatus] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const { user } = useAuth();
 
   // Configure react-dropzone
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -28,12 +30,17 @@ const Upload = () => {
       setUploadStatus("Please select a file first!");
       return;
     }
+    if (!user) {
+      setUploadStatus("Please log in first!");
+      return;
+    }
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("name", user.name);
 
     try {
-      await axios.post("http://localhost:5000/upload", formData, {
+      await axios.post("http://localhost:5000/api/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round(

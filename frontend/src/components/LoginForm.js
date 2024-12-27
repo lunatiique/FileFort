@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, Message, Container, Header } from 'semantic-ui-react';
 import './components.css';
+import  { useAuth } from './UserAuthentification';
+import { useNavigate } from 'react-router-dom'; 
 
 function UserForm() {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,6 +27,12 @@ function UserForm() {
 
       if (response.ok) {
         setMessage({ type: 'success', content: data.message });
+        login({name : name})
+        //Switch to the home page after delay of 200ms
+        setTimeout(() => {
+          navigate('/');
+        }, 200);
+
       } else {
         setMessage({ type: 'error', content: data.error });
       }
