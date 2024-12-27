@@ -349,6 +349,8 @@ def convert_blocs_128_to_text(data):
         text.extend(bloc)
     # convert the bitarray to text
     text = text.tobytes().decode('utf-8')
+    # remove all \x00 characters at the end of the text
+    text = text.replace('\x00', '')
     return text
 
 # Encode text using COBRA algorithm (input is a string, output is an hexadecimal string)

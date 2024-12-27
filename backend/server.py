@@ -227,6 +227,7 @@ def download_file(file_name):
         return jsonify({"error": "File name is required"}), 400
     try:
         # TODO : read the private key from the user logged in (ask him to give the file ? how can I do this ?)
+        
         private_key = read_key(f"../users/{user_name}/private_key.pem")
         decrypted_file = send_file_back(file_name, user_name, private_key)
         decrypted_file = decrypted_file.replace('\x00', '')
