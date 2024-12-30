@@ -1,5 +1,4 @@
 from hash import merkle_damgard_hash
-from cobra import generate_key_128
 from bitarray import bitarray
 
 # Function to normalize the key

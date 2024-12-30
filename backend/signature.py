@@ -1,7 +1,7 @@
 # This files contains the functions to sign and verify a message using RSA signature scheme.
 
 from hash import merkle_damgard_hash
-from generateKeyPair import generate_key_pair
+from classes.Keys import Keys
 
 # Signing
 def sign_message(message, private_key):
@@ -28,15 +28,16 @@ def verify_signature(message, signature, public_key):
 # Example usage
 if __name__ == "__main__":
     # Generate RSA keys
-    public_key, private_key = generate_key_pair(1024)
+    keys = Keys()
+    keys.generate_key_pair(1024)
 
     # Message
     message = "123"
 
     # Sign the message
-    signature = sign_message(message, private_key)
+    signature = sign_message(message, (keys.d, keys.n))
     print("Signature:", signature)
 
     # Verify the signature
-    valid = verify_signature(message, signature, public_key)
+    valid = verify_signature(message, signature, (keys.e, keys.n))
     print("Signature valid:", valid)

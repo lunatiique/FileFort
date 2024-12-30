@@ -1,5 +1,5 @@
 import random
-from generateKeyPair import generate_prime
+from mathFunctions import generate_prime
 
 def compute_secret_value(p, g, a):
     # Compute the public key

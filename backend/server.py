@@ -4,10 +4,10 @@ from datetime import datetime
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from bitarray import bitarray
-from user_functions import create_user, login_user
-from cobra import generate_key_128, encode_text, decode_text
-from RSAencrypt import encrypt_file_block, decrypt_file_block
-from generateKeyPair import read_key
+from classes.User import User
+from cobra.cobra import generate_key_128, encode_text, decode_text
+from rsaEncrypt import encrypt_file_block, decrypt_file_block
+from classes.Keys import Keys
 
 def encode_file(public_key, request):
     # Validate request data
@@ -95,7 +95,8 @@ def api_create_user():
         return jsonify({"error": "Password must be at least 8 characters long and contain a digit"}), 400
     try:
         # Call the create_user function
-        create_user(name, password)
+        user = User(name)
+        user.create(name, password)
         return jsonify({"message": "User created successfully!"}), 201
     except Exception as e:
         if 'WinError 183' in str(e):
@@ -115,7 +116,8 @@ def api_login_user():
 
     try:
         # Call the login_user function
-        success = login_user(name, password)
+        user = User(name)
+        success = user.login(name, password)
         if success:
             return jsonify({"message": "Login successful!"}), 200
         else:
@@ -181,8 +183,9 @@ def api_decode_text():
 @app.route("/api/upload", methods=["POST"])
 def upload_file():
     # read the public_key from the user logged in
-    public_key = read_key(f"../users/{request.form['name']}/public_key.pem")
-    result = encode_file(public_key, request)
+    keys = Keys()
+    keys.read_key(f"../users/{request.form['name']}/public_key.pem")
+    result = encode_file((keys.e, keys.n), request)
     return result
 
 @app.route('/api/files', methods=['GET'])
@@ -220,16 +223,15 @@ def get_files():
 def download_file(file_name):
     # Get the 'Authorization' header and extract the username
     user_name = request.headers.get('Authorization')
-
+    private_key8T = request.headers.get('PrivateKey')
     if user_name is None:
         return jsonify({"error": "Authorization header missing"}), 400
     if not file_name:
         return jsonify({"error": "File name is required"}), 400
     try:
         # TODO : read the private key from the user logged in (ask him to give the file ? how can I do this ?)
-        
-        private_key = read_key(f"../users/{user_name}/private_key.pem")
-        decrypted_file = send_file_back(file_name, user_name, private_key)
+        print(private_key8T)
+        decrypted_file = send_file_back(file_name, user_name, private_key8T)
         decrypted_file = decrypted_file.replace('\x00', '')
         # Use io.BytesIO to create a file-like object in memory
         file_stream = io.BytesIO(decrypted_file.encode('utf-8'))

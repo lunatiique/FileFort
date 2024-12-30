@@ -223,3 +223,28 @@ def is_prime(n):
         return False
     # Perform Miller-Rabin with fixed witnesses
     return miller_rabin_optimized(n, miller_rabin_witnesses)
+
+# Converts an integer to bytes, handling the length appropriately
+def int_to_bytes(n):
+    return n.to_bytes((n.bit_length() + 7) // 8, byteorder='big')
+
+def bytes_to_int(b):
+    """Converts bytes to an integer."""
+    return int.from_bytes(b, byteorder='big')
+
+# Generate a random prime number of the specified bit length
+def generate_prime(length):
+    while True:
+        n = pseudo_random_odd_of_n_bits(length)
+        if is_prime(n):
+            return n
+        
+# Generate a pseudo-random prime number based on a seed derived from a password
+def generate_prime_from_seed(seed, length):
+    random.seed(seed)  # Set the seed for reproducibility
+    while True:
+        # Generate a random candidate of the specified bit length
+        candidate = random.getrandbits(length)
+        candidate |= (1 << length - 1) | 1  # Ensure it's odd and has the right bit length
+        if is_prime(candidate): # Perform primality test
+            return candidate

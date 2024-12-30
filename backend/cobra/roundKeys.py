@@ -1,5 +1,5 @@
 from bitarray import bitarray
-from s_boxes import sboxes_cobra, apply_sbox
+from cobra.s_boxes import sboxes_cobra, apply_sbox
 
 # Define the binary representation of phi
 binary_phi = 0b10110111011010111011010111011011

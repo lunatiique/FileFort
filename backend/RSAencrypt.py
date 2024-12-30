@@ -1,8 +1,6 @@
-from generateKeyPair import generate_prime
-from mathFunctions import coprime, inv_mod
 import base64
 import ast
-from generateKeyPair import read_key
+from classes.Keys import Keys
 
 # Encrypt a message using RSA with the public key (n, e). C = M^e mod n
 def encrypt_message(message, n, e):
@@ -78,14 +76,13 @@ def decrypt_file_block(file, n, k):
 
 if __name__ == '__main__':
     #Read key from file
-    private_key = read_key(f"../users/luna/private_key.pem")
-    public_key = read_key(f"../users/luna/public_key.pem")
-    e, n = public_key
-    k, _ = private_key
+    keys = Keys()
+    keys.read_key(f"../users/luna/private_key.pem")
+    keys.read_key(f"../users/luna/public_key.pem")
 
     # Encrypt a file
     with open("test.txt", "rb") as file:  # Open in binary mode
-        encrypted_message = encrypt_file_block(file, n, e)
+        encrypted_message = encrypt_file_block(file, keys.n, keys.e)
 
     # Save the encrypted file
     with open("encrypted_file.txt", "w") as file:
@@ -93,7 +90,7 @@ if __name__ == '__main__':
 
     # Decrypt the file
     with open("encrypted_file.txt", "r") as file:
-        decrypted_message = decrypt_file_block(file, n, k)
+        decrypted_message = decrypt_file_block(file, keys.n, keys.d)
     print("Decrypted message:", decrypted_message)
 
 

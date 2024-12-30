@@ -1,18 +1,23 @@
+import random
 from classes.User import User
 from classes.CoffreFort import CoffreFort
 from classes.CA import CA
 from diffieHellman import compute_secret_value, compute_shared_secret
-from cobra import encode_text, decode_text
+from mathFunctions import generate_prime
+from cobra.cobra import encode_text, decode_text
 from hashmac import hmac, normalize_key
-from generateKeyPair import generate_prime, read_key
-import random
 from guillouQuisquater import guillou_quisquater_login
-from keyDerivationFunction import sponge_hash
+from hash import sponge_hash
+import json
 
 # Step 1: Verify Safe Certificate
 def verify_safe_certificate(ca, user):
     print("Step 1: Verifying Safe Certificate...")
-    certificate_valid = ca.verify_safe_certificate()
+    # 1. Demander le certificat du coffre fort
+    # Dans le cadre du projet, le certificat est généré et stocké dans le dossier du coffre fort (users/Filefort/certificate.json)
+    cert = json.load(open("../users/Filefort/certificate.json"))
+    # 2. Vérifier certificat auprès de l'autorité
+    certificate_valid = ca.verify_certificate(cert)
     if certificate_valid:
         print("Certificate is valid.")
     else:
@@ -103,7 +108,8 @@ def secure_communication(shared_secret, user, safe):
 if __name__ == "__main__":
     # Initialize CA, User, and Safe
     ca = CA()
-    user = User("luna", read_key("users/luna/public_key.pem"), read_key("users/luna/private_key.pem"))
+    user = User("luna")
+    user.login("luna", "blabla13")
     safe = CoffreFort()
 
     # Step 1: Verify the Safe's Certificate

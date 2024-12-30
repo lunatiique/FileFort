@@ -1,11 +1,11 @@
 #this file contains the functions that allows to encode your data using the COBRA algorithm
 import random 
 from bitarray import bitarray
-from roundKeys import key_scheduling
-from s_boxes import sboxes_cobra, apply_sbox, inverse_sboxes_cobra
+from cobra.roundKeys import key_scheduling
+from cobra.s_boxes import sboxes_cobra, apply_sbox, inverse_sboxes_cobra
 from multiprocessing import Pool
 from mathFunctions import inv_mod
-from keyDerivationFunction import sponge_hash
+from hash import sponge_hash
 import time
 
 # Generate random key of 128 bits
