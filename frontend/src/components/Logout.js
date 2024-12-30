@@ -8,6 +8,7 @@ const Logout = () => {
 
     useEffect(() => {
         logout(); // Trigger the logout function to clear the user
+        sessionStorage.removeItem('privateKey'); // Remove privateKey from session storage
         navigate('/'); // Redirect to the home page after logout    
     }, [logout, navigate]); // Ensure the effect runs only when `logout` or `history` changes
 

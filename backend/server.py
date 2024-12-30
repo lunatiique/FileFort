@@ -71,7 +71,7 @@ def send_file_back(file_name, user, private_key):
 
 
 app = Flask(__name__)
-CORS(app)  # Allow cross-origin requests from the React frontend
+CORS(app,expose_headers=["PrivateKey"])  # Allow cross-origin requests from the React frontend
 
 UPLOAD_FOLDER = "../users/"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Ensure upload folder exists
@@ -223,15 +223,18 @@ def get_files():
 def download_file(file_name):
     # Get the 'Authorization' header and extract the username
     user_name = request.headers.get('Authorization')
-    private_key8T = request.headers.get('PrivateKey')
+    privateKey = request.args.get('privateKey')
+    keys = Keys()
+    keys.decode_key(privateKey)
     if user_name is None:
         return jsonify({"error": "Authorization header missing"}), 400
     if not file_name:
         return jsonify({"error": "File name is required"}), 400
+    if not keys.d:
+        return jsonify({"error": "Valid private key is required"}), 400
     try:
         # TODO : read the private key from the user logged in (ask him to give the file ? how can I do this ?)
-        print(private_key8T)
-        decrypted_file = send_file_back(file_name, user_name, private_key8T)
+        decrypted_file = send_file_back(file_name, user_name, (keys.d, keys.n))
         decrypted_file = decrypted_file.replace('\x00', '')
         # Use io.BytesIO to create a file-like object in memory
         file_stream = io.BytesIO(decrypted_file.encode('utf-8'))

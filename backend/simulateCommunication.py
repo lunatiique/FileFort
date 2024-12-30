@@ -11,7 +11,7 @@ from hash import sponge_hash
 import json
 
 # Step 1: Verify Safe Certificate
-def verify_safe_certificate(ca, user):
+def verify_safe_certificate(ca):
     print("Step 1: Verifying Safe Certificate...")
     # 1. Demander le certificat du coffre fort
     # Dans le cadre du projet, le certificat est généré et stocké dans le dossier du coffre fort (users/Filefort/certificate.json)
@@ -60,7 +60,7 @@ def perform_key_exchange():
     return user_shared
 
 # Step 4: Secure Communication
-def secure_communication(shared_secret, user, safe):
+def secure_communication(shared_secret):
     print("Step 4: Secure Communication...")
 
     # Pass session key through KDF

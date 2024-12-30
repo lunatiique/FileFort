@@ -32,7 +32,7 @@ const Download = () => {
     const handleDownload = async (file) => {
         try {
             setLoading(true);
-            const response = await fetch(`http://localhost:5000/api/files/${file.name}`, {
+            const response = await fetch(`http://localhost:5000/api/files/${file.name}?privateKey=${sessionStorage.getItem("privateKey")}`, {
                 headers: {
                     Authorization: user.name,
                 },
@@ -78,17 +78,20 @@ const Download = () => {
     return (
         <Segment placeholder style={{ marginTop: "100px" }}>
             <h2>Download files from your fort</h2>
-            {user ? (
-                <Button
-                    primary
-                    onClick={fetchFiles}
-                    loading={loading}
-                    disabled={loading}
-                >
-                    <Icon name="download" /> Fetch Files
-                </Button>
+            {user && sessionStorage.getItem("privateKey") ? (
+                <>
+                    <Button
+                        primary
+                        onClick={fetchFiles}
+                        loading={loading}
+                        disabled={loading}
+                    >
+                        <Icon name="download" /> Fetch Files
+                    </Button>
+                </>
             ) : (
-                <Message info>Please log in to view files</Message>
+                user ? (<Message info> Please add your private key to the session</Message>) : (
+                    <Message info>Please log in to view files</Message>)
             )}
 
             {loading && <Loader active inline="centered" />}

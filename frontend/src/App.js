@@ -9,6 +9,7 @@ import Login from './pages/user/login';
 import LogoutPage from './pages/user/logout';
 import UploadFile from './pages/user/uploadFile';
 import DownloadFile from './pages/user/downloadFile';
+import PrivateKeyPage from './pages/user/privateKey';
 
 function App() {
   
@@ -24,6 +25,7 @@ function App() {
           <Route path="/user/logout" element={<LogoutPage/>} />
           <Route path="user/uploadFile" element={<UploadFile/>} />
           <Route path="user/downloadFile" element={<DownloadFile/>} />
+          <Route path="user/privateKey" element={<PrivateKeyPage/>} />
         </Routes>
       </Layout>
     </Router>

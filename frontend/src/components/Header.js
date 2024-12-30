@@ -26,7 +26,11 @@ const Header = () => {
       </Menu>
       <Menu className="sticky-header-right">
         <Menu.Menu position="right">
-          {user ? <Link to="/user/logout" className="item">Logout</Link> : 
+          {user ? 
+          <>
+          <Link to="/user/logout" className="item">Logout</Link>
+          <Link to="/user/privateKey" className="item">Add PK to session</Link>
+          </> : 
           <>
             <Link to="/user/register" className="item">
               Register

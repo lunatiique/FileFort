@@ -56,6 +56,8 @@ class Keys:
     def read_key(self,path):
         with open(path, "r") as key_file:
             key_data = key_file.read()
+            print("2")
+            print(key_data)
             # Identifier le type de clé (publique ou privée)
             if "PUBLIC" in key_data:
                 type = "PUBLIC"
@@ -95,6 +97,49 @@ class Keys:
                 self.n = n
             else:
                 raise ValueError("Invalid key file")
+            
+    def decode_key(self, key_data):
+        # Identify the key type
+        if "-----BEGIN PRIVATE KEY-----" in key_data:
+            key_type = "PRIVATE"
+        elif "-----BEGIN PUBLIC KEY-----" in key_data:
+            key_type = "PUBLIC"
+        else:
+            raise ValueError("Invalid key file format")
+
+        # Extract Base64 content between the header and footer
+        key_data = key_data.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
+        key_data = key_data.replace("-----BEGIN PUBLIC KEY-----", "").replace("-----END PUBLIC KEY-----", "")
+        print(key_data)
+        # Remove any whitespace or newline characters
+        key_data = key_data.strip().replace("\n", "").replace("\r", "").replace(" ", "+")
+
+        # Add padding if necessary
+        if len(key_data) % 4:
+            key_data += "=" * (4 - len(key_data) % 4)
+
+        # Decode Base64
+        try:
+            decoded_key = base64.b64decode(key_data, validate=True)
+        except base64.binascii.Error as e:
+            raise ValueError(f"Error decoding Base64 content: {e}")
+
+        # Extract e and n
+        try:
+            e_length = struct.unpack(">I", decoded_key[:4])[0]
+            e = int.from_bytes(decoded_key[4:4 + e_length], byteorder='big')
+            n = int.from_bytes(decoded_key[4 + e_length:], byteorder='big')
+        except Exception as e:
+            raise ValueError(f"Error parsing key components: {e}")
+
+        # Assign key values
+        if key_type == "PUBLIC":
+            self.e = e
+            self.n = n
+        elif key_type == "PRIVATE":
+            self.d = e
+            self.n = n
+
             
     # When user wants to login, check if the password is correct by generating the keys and comparing them to the stored keys
     def check_password(self, name, password, timestamp):
