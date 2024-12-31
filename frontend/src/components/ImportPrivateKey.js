@@ -33,8 +33,8 @@ const ImportPrivateKey = () => {
         setUploadStatus("The file does not appear to be a valid private key.");
         return;
       }
-
       sessionStorage.setItem("privateKey", fileContent); // Store in session
+      console.log("Private key stored successfully in session storage.");
       setUploadStatus("Private key stored successfully in session storage.");
     } catch (error) {
       console.error("Error processing file:", error);
@@ -50,7 +50,7 @@ const ImportPrivateKey = () => {
   };
 
   return (
-    <Segment placeholder style={{ marginTop: "100px" }}>
+    <Segment placeholder>
       <div
         {...getRootProps()}
         style={{
@@ -81,13 +81,14 @@ const ImportPrivateKey = () => {
           </Message>
         ) : (
           <p>
-            Drag and drop a private key file here, or click to select one.  
+            Drag and drop a private key file here, or click to select one.
             <Icon name="key" />
           </p>
         )}
       </div>
 
       <Button
+        type="button"
         color="teal"
         onClick={handleFileProcessing}
         disabled={!file}
@@ -98,8 +99,8 @@ const ImportPrivateKey = () => {
 
       {uploadStatus && (
         <Message
-          success={uploadStatus.includes("successfully")}
-          error={uploadStatus.includes("failed") || uploadStatus.includes("not")}
+          positive={uploadStatus.includes("successfully")}
+          negative={uploadStatus.includes("failed") || uploadStatus.includes("not")}
           style={{ marginTop: "20px" }}
         >
           {uploadStatus}

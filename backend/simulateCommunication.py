@@ -48,6 +48,7 @@ def perform_key_exchange():
     safe_private = random.randint(1, p - 1)
     safe_public = compute_secret_value(p, g, safe_private)
 
+
     # Exchange public values and compute shared secret
     user_shared = compute_shared_secret(p, safe_public, user_private)
     safe_shared = compute_shared_secret(p, user_public, safe_private)

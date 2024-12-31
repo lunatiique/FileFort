@@ -6,13 +6,14 @@ import json
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from classes.CA import CA
 from classes.Keys import Keys
+from classes.CoffreFort import CoffreFort
+from guillouQuisquater import guillou_quisquater_login
 
 class User:
     def __init__(self):
         self.name = None
-        self.e = None
-        self.n = None
-        self.v = None
+        self.keys = None
+        self.r = None
 
     def create(self, name, password):
         # Créer un dossier pour l'utilisateur dans le dossier users
@@ -36,7 +37,7 @@ class User:
         return keys.d, keys.n
 
     # Fonction pour qu'un utilisateur se connecte
-    def login(self, name, password):
+    def login(self, name, password, privateKey):
         # Vérifier d'abord si le nom de l'utilisateur existe
         if not os.path.exists(f"../users/{name}"):
             return False
@@ -59,31 +60,35 @@ class User:
             raise ValueError("Certificate verification failed")
         # 3. S'authentifier auprès du coffre-fort (ZPK)
         keys = Keys()
+        # Lecture des données publiques : clé publique et vérificateur
         keys.read_key(f"../users/{name}/public_key.pem")
-        # TODO : gestion de la clé privée ?? lien avec simulateCommunication
         keys.read_verificator_from_file(f"../users/{name}/verificator.pem")
-        self.e = keys.e
-        self.n = keys.n
-        #échanger clé de session
-
-        
-
+        # SIMPLIFICATION POUR LE PROJET : On récupère la clé privée pour réaliser l'authentification ZPK
+        keys.d = privateKey.d
+        # Assosier les clés à l'utilisateur
+        self.keys = keys
+        # Créer un objet CoffreFort
+        cf = CoffreFort()
+        # Authentification ZPK
+        zpk = guillou_quisquater_login(self, cf)
+        if not zpk:
+            return False
         return True
 
-    # Send commitment using a fresh random value r.
+    # Envoyer commitment en utilisant une valeur aléatoire r
     def send_commitment(self):
-        # Generate a random value r coprime to n
-        self.r = random.randint(0, self.n-1)
-        while self.r % self.n == 0:
-            self.r = random.randint(0, self.n-1)
-        # Calculate commitment x = r^e mod n
-        x = pow(self.r, self.e, self.n)
+        # Générer une valeur aléatoire r entre 0 et n-1, copremier avec n
+        self.r = random.randint(0, self.keys.n-1)
+        while self.r % self.keys.n == 0:
+            self.r = random.randint(0, self.keys.n-1)
+        # Calculer le commitment x = r^e mod n
+        x = pow(self.r, self.keys.e, self.keys.n)
         return x
 
-    # Respond to the challenge using the secret and r.
+    # Répondre au challenge reçu par le coffre fort
     def respond_challenge(self, c):
-        # Compute response y = r * d^c mod n
-        y = (self.r * pow(self.d, c, self.n)) % self.n
+        # Calculer la réponse y = r*d^c mod n
+        y = (self.r * pow(self.keys.d, c, self.keys.n)) % self.keys.n
         return y
 
 

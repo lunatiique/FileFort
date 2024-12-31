@@ -111,15 +111,18 @@ def api_login_user():
     data = request.get_json()
     name = data.get('name')
     password = data.get('password')
-
+    privateKey_encoded = data.get('privateKey') # Pour simplifier le projet, normalement les calculs de ZPK se font côté client
     # Validate input
     if not name or not password:
         return jsonify({"error": "Name and password are required"}), 400
 
     try:
+        # Decode the private key
+        privateKey = Keys()
+        privateKey.decode_key(privateKey_encoded)
         # Call the login_user function
         user = User()
-        success = user.login(name, password)
+        success = user.login(name, password, privateKey)
         if success:
             return jsonify({"message": "Login successful!"}), 200
         else:

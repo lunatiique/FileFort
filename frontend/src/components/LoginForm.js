@@ -3,6 +3,7 @@ import { Form, Input, Button, Message, Container, Header } from 'semantic-ui-rea
 import './components.css';
 import  { useAuth } from './UserAuthentification';
 import { useNavigate } from 'react-router-dom'; 
+import ImportPrivateKey from './ImportPrivateKey';
 
 function UserForm() {
   const [name, setName] = useState('');
@@ -15,12 +16,16 @@ function UserForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      if (!name || !password || !sessionStorage.getItem('privateKey')) {
+        setMessage({ type: 'error', content: 'Please fill in all the fields. (Do not forget to click on Import Private Key)' });
+        return;
+      }
       const response = await fetch('http://127.0.0.1:5000/api/login_user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, password }),
+        body: JSON.stringify({ name, password, privateKey: sessionStorage.getItem('privateKey') }),
       });
 
       const data = await response.json();
@@ -77,10 +82,13 @@ function UserForm() {
           />
         </Form.Field>
 
+        <ImportPrivateKey />
+
         <Button fluid size="large" type="submit">
           Login
         </Button>
       </Form>
+
 
       {message && (
         <Message

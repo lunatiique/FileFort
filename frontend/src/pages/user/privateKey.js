@@ -4,7 +4,7 @@ import ImportPrivateKey from '../../components/ImportPrivateKey';
 const PrivateKeyPage = () => {
 
     return (
-        <div>
+        <div style={{ marginTop: "100px" }}>
             <ImportPrivateKey/>
         </div>
     );
