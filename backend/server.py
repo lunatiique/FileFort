@@ -95,9 +95,11 @@ def api_create_user():
         return jsonify({"error": "Password must be at least 8 characters long and contain a digit"}), 400
     try:
         # Call the create_user function
-        user = User(name)
-        user.create(name, password)
-        return jsonify({"message": "User created successfully!"}), 201
+        user = User()
+        keys = Keys()
+        keys.d,keys.n = user.create(name, password)
+        private_key = keys.write_private_key_format()
+        return jsonify({"message": "User created successfully!", "private_key_pem": private_key}), 201
     except Exception as e:
         if 'WinError 183' in str(e):
             return jsonify({"error": "Username already exists"}), 400
@@ -116,7 +118,7 @@ def api_login_user():
 
     try:
         # Call the login_user function
-        user = User(name)
+        user = User()
         success = user.login(name, password)
         if success:
             return jsonify({"message": "Login successful!"}), 200

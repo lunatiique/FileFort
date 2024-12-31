@@ -8,8 +8,8 @@ from classes.CA import CA
 from classes.Keys import Keys
 
 class User:
-    def __init__(self, name):
-        self.name = name # public
+    def __init__(self):
+        self.name = None
         self.e = None
         self.n = None
         self.v = None
@@ -27,9 +27,13 @@ class User:
         keys = Keys()
         keys.generate_key_pair_from_password(password, timestamp, 1024)
         # Générer la valeur de vérification v de l'utilisateur (pour ZPK)
-        v = pow(keys.d, keys.e, keys.n)
-        # TODO : pas fini ici oh
-        keys.write_keys_to_file("../users/", name)
+        keys.v = pow(keys.d, keys.e, keys.n)
+        # Enregistrer la clé publique de l'utilisateur dans un fichier .PEM
+        keys.write_public_key_to_file("../users/", name)
+        # Enregistrer le vérificateur v dans un fichier .PEM
+        keys.write_verificator_to_file("../users/", name)
+        # Retourner la clé privée de l'utilisateur afin que celui-ci puisse la stocker en lieu sûr
+        return keys.d, keys.n
 
     # Fonction pour qu'un utilisateur se connecte
     def login(self, name, password):
@@ -57,11 +61,9 @@ class User:
         keys = Keys()
         keys.read_key(f"../users/{name}/public_key.pem")
         # TODO : gestion de la clé privée ?? lien avec simulateCommunication
-        keys.read_key(f"../users/{name}/private_key.pem")
+        keys.read_verificator_from_file(f"../users/{name}/verificator.pem")
         self.e = keys.e
         self.n = keys.n
-        self.d = keys.d
-        self.v = pow(self.d, self.e, self.n)
         #échanger clé de session
 
         
@@ -87,5 +89,7 @@ class User:
 
 if __name__ == "__main__":
     #test
-    user = User("luna")
-    user.login("luna", "blabla13")
+    user = User()
+    keys = Keys()
+    keys.read_verificator_from_file("../users/caca2/verificator.pem")
+

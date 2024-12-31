@@ -1,36 +1,42 @@
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 import base64
-from hash import sponge_hash
-from mathFunctions import inv_mod, coprime, generate_prime, generate_prime_from_seed, bytes_to_int, int_to_bytes
 import struct
 
+# Ajouter le chemin du dossier parent pour pouvoir importer les modules hash et mathFunctions
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from hash import sponge_hash
+from mathFunctions import inv_mod, coprime, generate_prime, generate_prime_from_seed, bytes_to_int, int_to_bytes
+
+# Classe Keys pour la gestion des clés RSA
 class Keys:
+
+    # Constructeur de la classe Keys
     def __init__(self):
         self.e = None
         self.n = None
         self.d = None
+        self.v = None
 
-    # Generate a key pair using the RSA algorithm (for Certificate Authority mainly)
+    # Générer une paire de clés RSA (utilisé principalement pour la création de CA et du coffre-fort)
     def generate_key_pair(self, key_size):
-        # Generate two random prime numbers
+        # générer deux nombres premiers p et q
         p = generate_prime(key_size // 2)
         q = generate_prime(key_size // 2)
         
-        # Ensure p and q are distinct
+        # Vérifier que p et q sont distincts
         while p == q:
             q = generate_prime(key_size // 2)
         
-        # Calculate n and phi(n)
+        # Calculer n et phi(n)
         self.n = p*q
         phi = (p-1)*(q-1)
         self.e = coprime(phi)
         self.d = inv_mod(self.e, phi)
+        # Vérifier que la clé privée est valide
         assert self.e * self.d % phi == 1
 
-    # Generate a key pair from a password using KDF
+    # Générer une paire de clés RSA à partir d'un mot de passe (utilisé pour la création/connexion d'un l'utilisateur)
     def generate_key_pair_from_password(self, password, timestamp, key_size):
         # Derive a key from the seed, which will be used to generate the primes p and q
         derived_key = sponge_hash(password + timestamp, key_size // 8)
@@ -56,8 +62,6 @@ class Keys:
     def read_key(self,path):
         with open(path, "r") as key_file:
             key_data = key_file.read()
-            print("2")
-            print(key_data)
             # Identifier le type de clé (publique ou privée)
             if "PUBLIC" in key_data:
                 type = "PUBLIC"
@@ -110,7 +114,6 @@ class Keys:
         # Extract Base64 content between the header and footer
         key_data = key_data.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "")
         key_data = key_data.replace("-----BEGIN PUBLIC KEY-----", "").replace("-----END PUBLIC KEY-----", "")
-        print(key_data)
         # Remove any whitespace or newline characters
         key_data = key_data.strip().replace("\n", "").replace("\r", "").replace(" ", "+")
 
@@ -168,7 +171,7 @@ class Keys:
             pub_file.write(public_pem)
 
     # Ecriture de la clé privée dans un fichier .PEM dans le dossier de l'utilisateur en format base64 (dans un but de test)
-    def write_private_key_to_file(self, path, name):
+    def write_private_key_format(self):
         priv_key_bytes = struct.pack(">I", len(int_to_bytes(self.d))) + int_to_bytes(self.d) + int_to_bytes(self.n)
         priv_key_base64 = base64.encodebytes(priv_key_bytes).decode('ascii')
         
@@ -178,14 +181,40 @@ class Keys:
             "-----END PRIVATE KEY-----\n"
         )
 
-        with open(f"{path}/{name}/private_key.pem", "w") as priv_file:
-            priv_file.write(private_pem)
+        return private_pem
 
-    # Write the keys to a .PEM file in the user's folder in base64 format
-    def write_keys_to_file(self, path, name):
-        self.write_private_key_to_file(path, name)
-        self.write_public_key_to_file(path, name)
-        print("Keys written to file!")
+    def write_verificator_to_file(self, path, name):
+        verificator_bytes = struct.pack(">I", len(int_to_bytes(self.v))) + int_to_bytes(self.v)
+        verificator_base64 = base64.encodebytes(verificator_bytes).decode('ascii')
+        verificator_pem = (
+            "-----BEGIN VERIFICATOR-----\n" +
+            verificator_base64 +
+            "-----END VERIFICATOR-----\n"
+        )
+
+        with open(f"{path}/{name}/verificator.pem", "w") as ver_file:
+            ver_file.write(verificator_pem)
+    
+    def read_verificator_from_file(self, path):
+        with open(path, "r") as ver_file:
+            ver_data = ver_file.read()
+            # Remove the header and footer
+            ver_data = ver_data.replace("-----BEGIN VERIFICATOR-----\n", "").replace("-----END VERIFICATOR-----\n", "")
+            # Clean up the Base64 data (remove line breaks)
+            ver_data = ver_data.replace("\n", "").replace("\r", "")
+            # Add padding if necessary
+            if len(ver_data) % 4:
+                ver_data += '=' * (4 - len(ver_data) % 4)
+            # Decode from base64
+            try:
+                ver_data = base64.b64decode(ver_data)
+            except Exception as e:
+                print("Error decoding base64:", e)
+                return None
+            # Extract length of v
+            v_length = struct.unpack(">I", ver_data[:4])[0]
+            v = int.from_bytes(ver_data[4:4+v_length], byteorder='big')
+            self.v = v
 
 if __name__ == "__main__":
     keys = Keys()

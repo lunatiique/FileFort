@@ -11,6 +11,6 @@ def guillou_quisquater_login(user,file):
 
 if __name__ == "__main__":
 
-    user = User("blabla")
+    user = User()
     file = CoffreFort()
     print(guillou_quisquater_login(user,file))

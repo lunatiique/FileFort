@@ -108,7 +108,7 @@ def secure_communication(shared_secret):
 if __name__ == "__main__":
     # Initialize CA, User, and Safe
     ca = CA()
-    user = User("luna")
+    user = User()
     user.login("luna", "blabla13")
     safe = CoffreFort()
 
