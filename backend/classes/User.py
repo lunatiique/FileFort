@@ -2,19 +2,23 @@ import random
 import os 
 import sys
 import json
-# Add the parent folder (where classes is located) to sys.path
+# Ajouter le chemin du dossier parent pour pouvoir importer les modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from classes.CA import CA
 from classes.Keys import Keys
 from classes.CoffreFort import CoffreFort
 from guillouQuisquater import guillou_quisquater_login
 
+# Classe User : représente un utilisateur du coffre fort
+# Un utilisateur est caractérisé par son nom, ses clés et une valeur aléatoire r (pour l'authentification ZPK)
 class User:
+    # Constructeur
     def __init__(self):
         self.name = None
         self.keys = None
         self.r = None
 
+    # Fonction pour créer un utilisateur (nom d'utilisateur, mot de passe)
     def create(self, name, password):
         # Créer un dossier pour l'utilisateur dans le dossier users
         os.mkdir(f"../users/{name}")
@@ -36,17 +40,18 @@ class User:
         # Retourner la clé privée de l'utilisateur afin que celui-ci puisse la stocker en lieu sûr
         return keys.d, keys.n
 
-    # Fonction pour qu'un utilisateur se connecte
+    # Fonction pour qu'un utilisateur se connecte (nom d'utilisateur, mot de passe, clé privée)
+    # La clé privée est nécessaire pour l'authentification ZPK (simplification pour le projet, mais non sécurisé)
     def login(self, name, password, privateKey):
         # Vérifier d'abord si le nom de l'utilisateur existe
         if not os.path.exists(f"../users/{name}"):
             return False
-        # Vérifier si le mot de passe entré par l'utilisateur est correct
         # Obtenir le timestamp du dossier de l'utilisateur sous forme de string
         timestamp = str(os.path.getctime(f"../users/{name}"))
         keys = Keys()
+        # Vérifier si le mot de passe entré par l'utilisateur est correct
         check = keys.check_password(name, password, timestamp)
-        # Si check est faux, le mot de passe ne correspond pas
+        # Si le check est faux, le mot de passe ne correspond pas
         if not check:
             return False
         # On procède à l'authentification double-sens :
@@ -71,6 +76,7 @@ class User:
         cf = CoffreFort()
         # Authentification ZPK
         zpk = guillou_quisquater_login(self, cf)
+        # Si l'authentification ZPK échoue, on retourne False
         if not zpk:
             return False
         return True
@@ -91,9 +97,8 @@ class User:
         y = (self.r * pow(self.keys.d, c, self.keys.n)) % self.keys.n
         return y
 
-
+# Pour réaliser des tests sur la classe User
 if __name__ == "__main__":
-    #test
     user = User()
     keys = Keys()
     keys.read_verificator_from_file("../users/caca2/verificator.pem")

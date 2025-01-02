@@ -1,25 +1,28 @@
-#this file contains the functions that allows to encode your data using the COBRA algorithm
-import random 
+import random
+from multiprocessing import Pool 
+import time
 from bitarray import bitarray
+
 from cobra.roundKeys import key_scheduling
 from cobra.s_boxes import sboxes_cobra, apply_sbox, inverse_sboxes_cobra
-from multiprocessing import Pool
 from mathFunctions import inv_mod
 from hash import sponge_hash
-import time
 
-# Generate random key of 128 bits
+# Variable qui définit le nombre de tours de COBRA
+NB_ROUNDS = 12
+
+# Génération aléatoire de la clé de 128 bits
 def generate_key_128():
     key = bitarray()
     key.frombytes(random.getrandbits(128).to_bytes(16, byteorder='big'))
     return key
 
 
-# Add round key : XOR with the iteration key (128 bits)
+# Ajout de la clé de tour : XOR entre le bloc et la clé
 def add_round_key(bloc, key):
     return bloc ^ key
 
-# Functions needed for parallelization of the S-boxes
+# Fonctions nécessaires pour la parallélisation des S-boxes
 def apply_first_sbox(bloc):
     return apply_sbox(bloc, sboxes_cobra[0])
 def apply_second_sbox(bloc):
@@ -29,7 +32,7 @@ def apply_third_sbox(bloc):
 def apply_fourth_sbox(bloc):
     return apply_sbox(bloc, sboxes_cobra[3])
 
-# Functions needed for parallelization of the inverse S-boxes
+# Fonctions nécessaires pour la parallélisation des S-boxes inversées
 def inverse_first_sbox(bloc):
     return apply_sbox(bloc, inverse_sboxes_cobra[0])
 def inverse_second_sbox(bloc):
@@ -39,12 +42,12 @@ def inverse_third_sbox(bloc):
 def inverse_fourth_sbox(bloc):
     return apply_sbox(bloc, inverse_sboxes_cobra[3])
 
-# Substitution : We apply 32 times (in parallel) the same S-box to each 4 bits of the bloc
+# Substitution : On applique 32 fois (en parallèle) la même S-box à chaque bloc de 4 bits du bloc
 def substitution(bloc, i):
-    # Separate the bloc into 32 blocs of 4 bits
+    # Séparer le bloc en 32 blocs de 4 bits
     blocs = [bloc[i:i+4] for i in range(0, 128, 4)]
-    # Use multiprocessing to apply the S-box in parallel
-    # Change the S-box applied depending on the round number
+    # Utiliser multiprocessing pour appliquer la S-box en parallèle
+    # Modifier la S-box appliquée en fonction du numéro de tour
     with Pool() as p:
         if i // 8 == 0:
             blocs = p.map(apply_first_sbox, blocs)
@@ -56,18 +59,19 @@ def substitution(bloc, i):
             blocs = p.map(apply_fourth_sbox, blocs)
         else :
             raise ValueError("Invalid round number.")
-    # Reassemble the bloc
+    # Réassembler le bloc
     bloc = bitarray()
     for b in blocs:
         bloc.extend(b)
+    # Retourner le bloc
     return bloc
 
-# Inverse substitution : We apply the inverse S-box to each 4 bits of the bloc
+# Substitution inversée : On applique la S-box inversée à chaque bloc de 4 bits du bloc
 def inverse_substitution(bloc, i):
-    # Separate the bloc into 32 blocs of 4 bits
+    # Séparer le bloc en 32 blocs de 4 bits
     blocs = [bloc[i:i+4] for i in range(0, 128, 4)]
-    # Use multiprocessing to apply the inverse S-box in parallel
-    # Change the S-box applied depending on the round number
+    # Utiliser multiprocessing pour appliquer la S-box en parallèle
+    # Modifier la S-box appliquée en fonction du numéro de tour
     with Pool() as p:
         if i // 8 == 0:
             blocs = p.map(inverse_first_sbox, blocs)
@@ -79,305 +83,341 @@ def inverse_substitution(bloc, i):
             blocs = p.map(inverse_fourth_sbox, blocs)
         else :
             raise ValueError("Invalid round number.")
-    # Reassemble the bloc
+    # Réassembler le bloc
     bloc = bitarray()
     for b in blocs:
         bloc.extend(b)
+    # Retourner le bloc
     return bloc
 
+# Appliquer la fonction de Feistel : f(x) = ((x+1)^-1mod257)-1
 def apply_feistel_function(right_bloc, key, feistel_table):
-    # The right bloc is divided into 8 blocs of 8 bits
+    # Le bloc de droite est divisé en 8 blocs de 8 bits
     sub_blocs = [right_bloc[i:i+8] for i in range(0, 64, 8)]
-    # Invert the order of the bits of each sub-bloc
+    # Inverser les bits de chaque bloc
     sub_blocs = [b[::-1] for b in sub_blocs]
-    # Apply the inverse function f(x) = ((x+1)^-1mod257)-1
+    # Appliquer la fonction de Feistel à chaque bloc
     z_blocs = [feistel_table[int(b.to01(), 2)] for b in sub_blocs]
-    # Reassemble the bloc
+    # Réassembler les blocs
     z_bloc = bitarray()
     for z in z_blocs:
         z_bloc.extend(z)
-    # Apply permutation P to the bloc
+    # Appliquer une permutation P au bloc
     z_bloc = permutation_P(z_bloc)
-    # Divide into 8 blocs of 8 bits again
+    # Diviser à nouveau le bloc en 8 blocs de 8 bits
     z_blocs = [z_bloc[i:i+8] for i in range(0, 64, 8)]
-    # Generate pseudo-random numbers using z_blocs as seeds
+    # Générer des nombres pseudo-aléatoires à partir des blocs z
     prng_bloc = generate_pseudo_random_numbers(z_blocs)
-    # Derivate the key using KDF algorithm
+    # Dériver la clé en utilisant l'algorithme KDF
     derivated_key_tmp = sponge_hash(key.to01(), 8)
-    # Convert to bitarray
+    # Convertir en bitarray
     derivated_key = bitarray()
     derivated_key.frombytes(derivated_key_tmp)
-    # XOR the pseudo-random numbers with the derivated key
+    # XOR le nombre pseudo-aléatoire avec la clé dérivée
     output = prng_bloc ^ derivated_key
     return output
 
-# Permutation P : We apply a permutation to the bloc of 64 bits
+# Permutation P : On applique une permutation sur le bloc de 64 bits
 def permutation_P(bloc):
-    # define permutation vector (improve it ?)
+    # define permutation vector (TODO)
     P = [63, 31, 62, 30, 61, 29, 60, 28, 59, 27, 58, 26, 57, 25, 56, 24, 55, 23, 54, 22, 53, 21, 52, 20, 51, 19, 50, 18, 49, 17, 48, 16, 47, 15, 46, 14, 45, 13, 44, 12, 43, 11, 42, 10, 41, 9, 40, 8, 39, 7, 38, 6, 37, 5, 36, 4, 35, 3, 34, 2, 33, 1, 32, 0]
-    # Apply the permutation
+    # Appliquer la permutation si le bloc est bien de 64 bits (sinon, soulever une erreur)
     if len(bloc) == 64:
         bloc = bitarray([bloc[i] for i in P])
     else:
         raise ValueError("Bloc must be of 64 bits.")
     return bloc
 
-# Generate pseudo-random numbers using z_blocs as seeds
+# Générer des nombres pseudo-aléatoires à partir des blocs z
 def generate_pseudo_random_numbers(z_blocs):
+    # Initialiser la liste des nombres pseudo-aléatoires à une liste vide
     prng_blocs = []
     for z_bloc in z_blocs:
-        # Generate pseudo-random number using z_bloc as seed
+        # Mettre la seed du générateur de nombres pseudo-aléatoires à la valeur du bloc z
         random.seed(int(z_bloc.to01(), 2))
         prng_bloc = bitarray()
+        # Générer un nombre pseudo-aléatoire de 8 bits
         prng_bloc.frombytes(random.getrandbits(8).to_bytes(1, byteorder='big'))
         prng_blocs.append(prng_bloc)
-    # We assemble the pseudo-random numbers into a bloc
+    # On concatène les nombres pseudo-aléatoires pour obtenir un bloc de 64 bits
     prng_bloc = bitarray()
     for prng in prng_blocs:
         prng_bloc.extend(prng)
     return prng_bloc
 
-# Compute the Feistel function : f(x) = ((x + 1)^-1 mod 257)-1
+# Calculer la fonction de feistel : f(x) = ((x + 1)^-1 mod 257)-1
 def feistel_function(x):
-    # If x is 256, the result is 0 (to avoid division by 0)
+    # Si x = 256, on retourne 0 (pour éviter la division par 0)
     if x == 256:
         return 0
     else:
         return inv_mod((x + 1) % 257, 257) - 1
 
 
-# Tabulate the Feistel function for all values of x from 0 to 255.
+# Tabulation de la fonction de Feistel : On calcule la fonction de Feistel pour chaque valeur de 0 à 255
 def tabulation_function():
     table = [0] * 256
     for i in range(256):
         table[i] = bitarray(format(feistel_function(i), '08b'))
     return table
 
-# Feistel de Réré : We apply 3 or 4 rounds of the Feistel network
+# Feistel de Réré : On applique 3 ou 4 tours du réseau de Feistel
 def feistel_de_rere(bloc, feistel_table, key):
-    # Separate the bloc into 2 blocs of 64 bits
+    # Séparer le bloc en 2 blocs de 64 bits
     left_bloc = bloc[:64]
     right_bloc = bloc[64:]
-    # We do 3 rounds of the Feistel network
+    # On fait 3 tours du réseau de Feistel (par soucis de performance)
     for _ in range(0, 3):
+        # On sauvegarde le bloc de gauche
         tmp_left_bloc = left_bloc
+        # On met le bloc de gauche à jour en lui donnant la valeur du bloc de droite
         left_bloc = right_bloc
+        # On met le bloc de droite à jour en lui donnant la valeur du bloc de gauche XOR la fonction de Feistel appliquée au bloc de droite
         right_bloc = tmp_left_bloc ^ apply_feistel_function(right_bloc, key, feistel_table)
-    # We reassemble the bloc
+    # On réassemble le bloc
     bloc = bitarray()
     bloc.extend(left_bloc)
     bloc.extend(right_bloc)
     return bloc
 
-# Decipher Feistel de Réré : We apply 3 or 4 rounds of the Feistel network in reverse
+# Déchiffrer la Feistel de Réré : On applique 3 ou 4 tours du réseau de feistel en sens inverse
 def decipher_feistel_de_rere(bloc, feistel_table, key):
-    # Separate the bloc into 2 blocs of 64 bits
+    # Séparer le bloc en 2 blocs de 64 bits
     left_bloc = bloc[:64]
     right_bloc = bloc[64:]
-    # We do 3 rounds of the Feistel network
+    # On applique 3 tours du réseau de Feistel en sens inverse (comme on en applique 3 dans la fonction de Feistel)
     for _ in range(0, 3):
+        # On sauvegarde le bloc de droite
         tmp_right_bloc = right_bloc
+        # On met le bloc de droite à jour en lui donnant la valeur du bloc de gauche
         right_bloc = left_bloc
+        # On met le bloc de gauche à jour en lui donnant la valeur du bloc de droite XOR la fonction de Feistel appliquée au bloc de gauche
         left_bloc = tmp_right_bloc ^ apply_feistel_function(left_bloc, key, feistel_table)
-    # We reassemble the bloc
+    # On réassemble le bloc
     bloc = bitarray()
     bloc.extend(left_bloc)
     bloc.extend(right_bloc)
     return bloc
 
-# Linear transformation : We realize binary operations on 4 blocs of 32 bits
+# Transformation linéaire : On réalise des opérations binaires sur 4 blocs de 32 bits
 def linear_transformation(bloc):
-    # Separate the bloc into 4 blocs of 32 bits
+    # Séparer les blocs en 4 blocs de 32 bits
     blocs = [bloc[i:i+32] for i in range(0, 128, 32)]
-    # circular left shift of 13 bits for bloc 0
+    # Décalage circulaire à gauche de 13 bits pour le bloc 0
     blocs[0] = blocs[0][13:] + blocs[0][:13]
-    # circular left shift of 3 bits for bloc 2
+    # Décalage circulaire à gauche de 3 bits pour le bloc 2
     blocs[2] = blocs[2][3:] + blocs[2][:3]
-    # XOR operation between bloc 0, 1 and 2 saved in bloc 1
+    # XOR entre le bloc 0, 1 et 2 sauvegardé dans le bloc 1
     blocs[1] = blocs[0] ^ blocs[1] ^ blocs[2]
-    # XOR operation between bloc 2, 3 and 0 (with circular left shift of 3 bits) saved in bloc 3
+    # XOR entre le bloc 2, 3 et 0 (avec un décalage circulaire à gauche de 3 bits) sauvegardé dans le bloc 3
     blocs[3] = blocs[2] ^ blocs[3] ^ (blocs[0][3:] + blocs[0][:3])
-    # circular left shift of 1 bit for bloc 1
+    # Décalage circulaire à gauche de 1 bit pour le bloc 1
     blocs[1] = blocs[1][1:] + blocs[1][:1]
-    # circular left shift of 7 bits for bloc 3
+    # Décalage circulaire à gauche de 7 bits pour le bloc 3
     blocs[3] = blocs[3][7:] + blocs[3][:7]
-    # XOR operation between bloc 1, 0 and 3 saved in bloc 0
+    # XOR entre le bloc 0, 1 et 3 sauvegardé dans le bloc 0
     blocs[0] = blocs[1] ^ blocs[0] ^ blocs[3]
-    # XOR operation between bloc 3, 2 and 1 (with circular left shift of 7 bits) saved in bloc 2
+    # XOR entre le bloc 3, 2 et 1 (avec un décalage circulaire à gauche de 7 bits) sauvegardé dans le bloc 2
     blocs[2] = blocs[3] ^ blocs[2] ^ (blocs[1][7:] + blocs[1][:7])
-    # circular left shift of 5 bits for bloc 0
+    # Décalage circulaire à gauche de 5 bits pour le bloc 0
     blocs[0] = blocs[0][5:] + blocs[0][:5]
-    # circular left shift of 22 bits for bloc 2
+    # Décalage circulaire à gauche de 22 bits pour le bloc 2
     blocs[2] = blocs[2][22:] + blocs[2][:22]
-    # We reassemble the bloc
+    # On réassemble le bloc
     bloc = bitarray()
     for b in blocs:
         bloc.extend(b)
     return bloc
 
-# Inverse linear transformation : We realize binary operations on 4 blocs of 32 bits
+# Transformation linéaire inverse : On réalise des opérations binaires sur 4 blocs de 32 bits
 def inverse_linear_transformation(bloc):
-    # Separate the bloc into 4 blocs of 32 bits
+    # Séparer les blocs en 4 blocs de 32 bits
     blocs = [bloc[i:i+32] for i in range(0, 128, 32)]
-    # circular right shift of 22 bits for bloc 2
+    # Décalage circulaire à droite de 22 bits pour le bloc 2
     blocs[2] = blocs[2][-22:] + blocs[2][:-22]
-    # circular right shift of 5 bits for bloc 0
+    # Décage circulaire à droite de 5 bits pour le bloc 0
     blocs[0] = blocs[0][-5:] + blocs[0][:-5]
-    # XOR operation between bloc 3, 2 and 1 (with circular left shift of 7 bits) saved in bloc 2
+    # XOR entre le bloc 3, 2 et 1 (avec un décalage circulaire à droite de 7 bits) sauvegardé dans le bloc 2
     blocs[2] = blocs[3] ^ blocs[2] ^ (blocs[1][7:] + blocs[1][:7])
-    # XOR operation between bloc 0, 1 and 3 saved in bloc 0
+    # XOR entre le bloc 0, 1 et 3 sauvegardé dans le bloc 0
     blocs[0] = blocs[0] ^ blocs[1] ^ blocs[3]
-    # circular right shift of 7 bits for bloc 3
+    # Décalage circulaire à droite de 7 bits pour le bloc 3
     blocs[3] = blocs[3][-7:] + blocs[3][:-7]
-    # circular right shift of 1 bit for bloc 1
+    # Décalage circulaire à droite de 1 bit pour le bloc 1
     blocs[1] = blocs[1][-1:] + blocs[1][:-1]
-    # XOR operation between bloc 2, 3 and 0 (with circular left shift of 3 bits) saved in bloc 3
+    # XOR entre le bloc 2, 3 et 0 (avec un décalage circulaire à droite de 3 bits) sauvegardé dans le bloc 3
     blocs[3] = blocs[2] ^ blocs[3] ^ (blocs[0][3:] + blocs[0][:3])
-    # XOR operation between bloc 0, 1 and 2 saved in bloc 1
+    # XOR entre le bloc 0, 1 et 2 sauvegardé dans le bloc 1
     blocs[1] = blocs[0] ^ blocs[1] ^ blocs[2]
-    # circular right shift of 3 bits for bloc 2
+    # Décalage circulaire à droite de 3 bits pour le bloc 2
     blocs[2] = blocs[2][-3:] + blocs[2][:-3]
-    # circular right shift of 13 bits for bloc 0
+    # Décalage circulaire à droite de 13 bits pour le bloc 0
     blocs[0] = blocs[0][-13:] + blocs[0][:-13]
-    # We reassemble the bloc
+    # On réassemble le bloc
     bloc = bitarray()
     for b in blocs:
         bloc.extend(b)
     return bloc
 
+# Permutation initiale : On applique une permutation sur le bloc de 128 bits
 def initial_permutation(bloc, key):
+    # On met le seed du générateur de nombres pseudo-aléatoires à la valeur de la clé du tour
     random.seed(int(key.to01(), 2))
-    # permutation vector of 128 bits
+    # On génère un vecteur de permutation de 128 bits (valeurs de 0 à 127)
     p_vector = list(range(128))
+    # On génère pseudo-aléatoirement les valeurs du vecteur de permutation
     random.shuffle(p_vector)
-    # apply the permutation
+    # On applique la permutation
     bloc = bitarray([bloc[i] for i in p_vector])
     return bloc
 
+# Permutation initiale inverse : On applique une permutation sur le bloc de 128 bits
 def reverse_initial_permutation(bloc, key):
+    # On met le seed du générateur de nombres pseudo-aléatoires à la valeur de la clé du tour
     random.seed(int(key.to01(), 2))
-    # permutation vector of 128 bits
+    # On génère un vecteur de permutation de 128 bits (valeurs de 0 à 127)
     p_vector = list(range(128))
+    # On génère pseudo-aléatoirement les valeurs du vecteur de permutation
     random.shuffle(p_vector)
-    # apply the permutation
+    # On applique la permutation
     bloc = bitarray([bloc[p_vector.index(i)] for i in range(128)])
     return bloc
 
+# Permutation finale : On applique une permutation sur le bloc de 128 bits
 def final_permutation(bloc, key):
+    # On met le seed du générateur de nombres pseudo-aléatoires à la valeur de la clé du tour
     random.seed(int(key.to01(), 2))
-    # permutation vector of 128 bits
+    # On génère un vecteur de permutation de 128 bits (valeurs de 0 à 127)
     p_vector = list(range(128))
+    # On génère pseudo-aléatoirement les valeurs du vecteur de permutation
     random.shuffle(p_vector)
-    # apply the permutation
+    # On applique la permutation
     bloc = bitarray([bloc[i] for i in p_vector])
     return bloc
 
+# Permutation finale inverse : On applique une permutation sur le bloc de 128 bits
 def reverse_final_permutation(bloc, key):
+    # On met le seed du générateur de nombres pseudo-aléatoires à la valeur de la clé du tour
     random.seed(int(key.to01(), 2))
-    # permutation vector of 128 bits
+    # On génère un vecteur de permutation de 128 bits (valeurs de 0 à 127)
     p_vector = list(range(128))
+    # On génère pseudo-aléatoirement les valeurs du vecteur de permutation
     random.shuffle(p_vector)
-    # apply the permutation
+    # On applique la permutation
     bloc = bitarray([bloc[p_vector.index(i)] for i in range(128)])
     return bloc
 
 
-# Encoding : We encode the data using the COBRA algorithm
+# Encodage : On encode un bloc de données en utilisant l'algorithme COBRA
 def encode_bloc(data, key):
-    # We ensure the data is a 128-bit bloc
+    # On s'assure que les données représentent un bloc de 128 bits
     if len(data) != 128:
         raise ValueError("Data must be of 128 bits.")
-    # We tabulate the Feistel function
+    # On tabule la fonction de Feistel
     feistel_table = tabulation_function()
-    # We generate the 33 keys
+    # On génère les 33 clés
     keys = key_scheduling(key)
-    # Initial permutation
+    # Permutation initiale
     data = initial_permutation(data, keys[0])
-    # We apply the 32 rounds
-    for i in range(0, 12):
+    # On applique les X tours (définis par NB_ROUNDS) de COBRA
+    for i in range(0, NB_ROUNDS):
+        # XOR avec la clé du tour
         bloc = add_round_key(data, keys[i])
+        # On applique la substitution
         bloc = substitution(bloc, i)
+        # On applique la fonction de Feistel
         bloc = feistel_de_rere(bloc, feistel_table, keys[i])
+        # On applique la transformation linéaire
         bloc = linear_transformation(bloc)
-    # Final permutation
+    # Permutation finale
     data = final_permutation(data, keys[31])
-    # Final XOR with the last key
+    # XOR avec la dernière clé
     data = add_round_key(data, keys[32])
     return data
 
-# Decoding : We decode the data using the COBRA algorithm
+# Decodage : On décode un bloc de données en utilisant l'algorithme COBRA
 def decode_bloc(data, key):
-    # We ensure the data is a 128-bit bloc
+    # On s'assure que les données représentent un bloc de 128 bits
     if len(data) != 128:
         raise ValueError("Data must be of 128 bits.")
-    # We tabulate the Feistel function
+    # On tabule la fonction de Feistel
     feistel_table = tabulation_function()
-    # We generate the 33 keys
+    # On génère les 33 clés
     keys = key_scheduling(key)
-    # We remove the last key
+    # On fait un XOR avec la dernière clé
     data = add_round_key(data, keys[32])
-    # Reverse final permutation
+    # On inverse la permutation finale
     data = reverse_final_permutation(data, keys[31])
-    # We apply the 32 rounds in reverse
-    for i in range(12, 0, -1):
+    # On applique les X tours (définis par NB_ROUNDS) de COBRA en sens inverse
+    for i in range(NB_ROUNDS, 0, -1):
+        # On inverse la transformation linéaire
         bloc = inverse_linear_transformation(data)
+        # On applique la fonction de Feistel en sens inverse
         bloc = decipher_feistel_de_rere(bloc, feistel_table, keys[i])
+        # On inverse la substitution
         bloc = inverse_substitution(bloc, i)
+        # On fait un XOR avec la clé du tour
         bloc = add_round_key(data, keys[i])
-    # Reverse initial permutation
+    # On inverse la permutation initiale
     data = reverse_initial_permutation(data, keys[0])
     return data
 
 
-# For testing purposes, we convert the text into 128-bit blocs
+# Convertir du texte en blocs de 128 bits
 def convert_text_to_blocs_128(text):
-    # convert text to binary representation using bitarray
+    # Convrtir le texte en binaire en utilisant une structure bitarray
     data = bitarray()
     data.frombytes(text.encode('utf-8'))
-    # separate data into 128-bit blocks
+    # Séparer les données en blocs de 128 bits
     data = [data[i:i+128] for i in range(0, len(data), 128)]
-    # add padding to the last block if necessary
+    # Ajouter des 0 pour compléter le dernier bloc si nécessaire
     if len(data[-1]) < 128:
         data[-1].extend('0' * (128 - len(data[-1])))
     return data
 
-# For testing purposes, we convert the 128-bit blocs into text
+# Convertir des blocs de 128 bits en texte
 def convert_blocs_128_to_text(data):
-    #join all the 128-bit blocks
+    # Regrouper tous les blocs en un seul bloc
     text = bitarray()
     for bloc in data:
         text.extend(bloc)
-    # convert the bitarray to text
+    # Convertir le bloc binaire en texte
     text = text.tobytes().decode('utf-8')
-    # remove all \x00 characters at the end of the text
+    # Supprimer les caractères nuls \x00 ajoutés pour compléter le dernier bloc
     text = text.replace('\x00', '')
     return text
 
-# Encode text using COBRA algorithm (input is a string, output is an hexadecimal string)
+# Encoder un texte en utilisant l'algorithme COBRA
 def encode_text(text, key):
+    # Convertir le texte en blocs de 128 bits
     data = convert_text_to_blocs_128(text)
+    # Initialiser une liste pour stocker les données encodées
     encoded_data = []
+    # Encoder chaque bloc de données
     for bloc in data:
         encoded_data.append(encode_bloc(bloc, key))
-    # convert the encoded data to hexadecimal
+    # Convertir les données encodées en hexadécimal
     encoded_data = [b.tobytes().hex() for b in encoded_data]
-    # join all the hexadecimal blocs
+    # Regrouper les données encodées en une seule chaîne de caractères
     encoded_data = ''.join(encoded_data)
     return encoded_data
 
-# Decode text using COBRA algorithm (input is an hexadecimal string)
+# Déchiffrer un texte en utilisant l'algorithme COBRA (entrée : chaîne de caractères encodée en hexadécimal)
 def decode_text(data, key):
-    # convert the hexadecimal data to bitarray
+    # Convertir les données hexadécimales en binaire
     bin_data = bitarray()
     bin_data.frombytes(bytes.fromhex(data))
-    # separate data into 128-bit blocks
+    # Séparer les données en blocs de 128 bits
     bin_data = [bin_data[i:i+128] for i in range(0, len(bin_data), 128)]
-    # initialize the decoded data
+    # Initialiser une liste pour stocker les données décodées
     decoded_data = []
+    # Décoder chaque bloc de données
     for bloc in bin_data:
         decoded_data.append(decode_bloc(bloc, key))
+    # Convertir les données décodées en texte avant de les retourner
     return convert_blocs_128_to_text(decoded_data)
 
+# Fonction de test
 if __name__ == "__main__":
     key = generate_key_128()
     time1 = time.time()
