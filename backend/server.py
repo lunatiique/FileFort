@@ -9,6 +9,7 @@ from cobra.cobra import generate_key_128, encode_text, decode_text
 from rsaEncrypt import encrypt_file_block, decrypt_file_block
 from classes.Keys import Keys
 
+#
 def encode_file(public_key, request):
     # Validate request data
     if "file" not in request.files:
@@ -98,7 +99,6 @@ def api_create_user():
         user = User()
         keys = Keys()
         keys.d,keys.n = user.create(name, password)
-        private_key = keys.write_private_key_format()
         return jsonify({"message": "User created successfully!", "private_key_pem": private_key}), 201
     except Exception as e:
         if 'WinError 183' in str(e):

@@ -1,10 +1,14 @@
 import random
-
+from classes.Keys import Keys
 # Classe représentant le coffre fort
 class CoffreFort:
     # Constructeur
     def __init__(self):
         self.name = "FileFort"
+        self.keys = Keys()
+        self.keys.read_key("../users/Filefort/public_key.pem")
+        self.keys.read_key("../users/Filefort/private_key.pem")
+        self.shared_secret = None
 
     # Envoi d'un challenge à l'utilisateur (dans le cadre de l'authentification ZPK Guillou-Quisquater)
     def send_challenge(self,user):

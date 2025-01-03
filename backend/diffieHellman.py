@@ -1,37 +1,39 @@
 import random
 from mathFunctions import generate_prime
 
+# Calculer la valeur secrète pour un utilisateur (p et g sont publics, a est privé)
 def compute_secret_value(p, g, a):
-    # Compute the public key
+    # Calculer la valeur secrète
     A = pow(g, a, p)
     return A
 
-def compute_shared_secret(p, B, a):
+# Calculer le secret partagé entre deux utilisateurs (p est public, B est la valeur secrète de l'autre utilisateur, a est privé)
+def compute_shared_secret(p, B, a, user):
     # Compute the shared secret
-    s = pow(B, a, p)
-    return s
+    user.shared_secret = pow(B, a, p)
 
 
+# Fonction pour simuler Diffie-Hellman entre deux utilisateurs (Alice et Bob)
 def simulate_diffie_hellman():
-    # Generate a random prime number p and a random number g smaller than p together
+    # Générer un nombre premier p et un générateur g (public)
     p = generate_prime(32)
     g = random.randint(1, p - 1)
-    #Alice secretely chooses a random number a
+    # Alice choisit secrètement un nombre aléatoire a
     a = random.randint(1, p - 1)
-    #Bob secretely chooses a random number b
+    #Bob choisit secrètement un nombre aléatoire b
     b = random.randint(1, p - 1)
-    # Compute secret value for Alice
+    # Calculer la valeur secrète pour Alice
     A = compute_secret_value(p, g, a)
-    # Compute secret value for Bob
+    # Calculer la valeur secrète pour Bob
     B = compute_secret_value(p, g, b)
-    # Compute shared secret for Alice
+    # Calculer le secret partagé pour Alice
     secret_alice = compute_shared_secret(p, B, a)
-    # Compute shared secret for Bob
+    # Calculer le secret partagé pour Bob
     secret_bob = compute_shared_secret(p, A, b)
-    # Check if the shared secret is the same
+    # Vérifier si les secrets partagés sont identiques
     print(secret_alice)
     print(secret_alice == secret_bob)
 
-
+# Tester la simulation Diffie-Hellman
 if __name__ == '__main__':
     simulate_diffie_hellman()

@@ -17,6 +17,7 @@ class User:
         self.name = None
         self.keys = None
         self.r = None
+        self.shared_secret = None
 
     # Fonction pour créer un utilisateur (nom d'utilisateur, mot de passe)
     def create(self, name, password):

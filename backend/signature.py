@@ -1,43 +1,41 @@
-# This files contains the functions to sign and verify a message using RSA signature scheme.
-
 from hash import merkle_damgard_hash
 from classes.Keys import Keys
 
-# Signing
+# Fonction pour signer un message à l'aide d'une clé privée
 def sign_message(message, private_key):
     d, n = private_key
-    # hash the message
+    # Hasher le message
     h = merkle_damgard_hash(message)
-    # convert hex string h to int
+    # Convertir la chaîne hexadécimale h en entier
     h = int(h, 16)
-    # sign : h^d mod n
+    # Signature : h^d mod n
     signature = pow(h, d, n)
     return signature
 
-# Verification
+# Fonction pour vérifier une signature à l'aide d'une clé publique
 def verify_signature(message, signature, public_key):
     e, n = public_key
-    # hash the message
+    # Hasher le message
     h = merkle_damgard_hash(message)
-    # convert hex string h to int
+    # Convertir la chaîne hexadécimale h en entier
     h = int(h, 16)
-    # verify : signature^e mod n == h
+    # Vérifier la signature : signature^e mod n == h
     h_from_signature = pow(signature, e, n)
     return h == h_from_signature
 
-# Example usage
+# Exemple d'utilisation
 if __name__ == "__main__":
-    # Generate RSA keys
+    # Génerer clés RSA
     keys = Keys()
     keys.generate_key_pair(1024)
 
     # Message
     message = "123"
 
-    # Sign the message
+    # Signer le message
     signature = sign_message(message, (keys.d, keys.n))
     print("Signature:", signature)
 
-    # Verify the signature
+    # Verifier la signature
     valid = verify_signature(message, signature, (keys.e, keys.n))
-    print("Signature valid:", valid)
+    print("Signature valide:", valid)
