@@ -10,6 +10,7 @@ import LogoutPage from './pages/user/logout';
 import UploadFile from './pages/user/uploadFile';
 import DownloadFile from './pages/user/downloadFile';
 import PrivateKeyPage from './pages/user/privateKey';
+import Simulate from './pages/cipher/simulateCommunication.js';
 
 function App() {
   
@@ -26,6 +27,7 @@ function App() {
           <Route path="user/uploadFile" element={<UploadFile/>} />
           <Route path="user/downloadFile" element={<DownloadFile/>} />
           <Route path="user/privateKey" element={<PrivateKeyPage/>} />
+          <Route path="cipher/simulateCommunication" element={<Simulate/>} />
         </Routes>
       </Layout>
     </Router>

@@ -5,6 +5,7 @@
     width: auto;
     z-index: 1000;
     margin-top : 10px;
+    left: 10%;
 }
 
 .sticky-header-right {

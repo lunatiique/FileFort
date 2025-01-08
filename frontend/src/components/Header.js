@@ -14,14 +14,18 @@ const Header = () => {
           <Image src="logo512.png" alt="logo" className="iconImg" />
         </Link>
         {user ? <><Link to="/cipher/encode">
-          <a className="item">Encode</a>
+          <a className="item">COBRA</a>
         </Link>
         <Link to="/user/uploadFile">
           <a className="item">Upload File</a>
         </Link>
         <Link to="/user/downloadFile">
           <a className="item">Download File</a>
-        </Link></> : null}
+        </Link>
+        <Link to="/cipher/simulateCommunication">
+          <a className="item">Simulate Communication</a>
+        </Link>
+        </> : null}
         
       </Menu>
       <Menu className="sticky-header-right">

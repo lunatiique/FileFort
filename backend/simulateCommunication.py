@@ -11,7 +11,8 @@ from guillouQuisquater import guillou_quisquater_login
 from hash import sponge_hash
 import json
 
-# Fichier de simulation de communication sécurisée entre un utilisateur et un coffre fort
+
+
 
 # Etape 1: Vérifier le certificat du coffre fort
 def verify_safe_certificate(ca):
@@ -41,7 +42,7 @@ def perform_key_exchange(user, safe):
     print("Étape 3: Échange de clés...")
 
     # Générer un nombre premier et un générateur
-    p = generate_prime(32)
+    p = generate_prime(256)
     g = random.randint(1, p - 1)
 
     # L'utilisateur génère une valeur secrète
@@ -58,16 +59,15 @@ def perform_key_exchange(user, safe):
 
     if user.shared_secret != safe.shared_secret:
         print("Échec de l'échange de clés : les secrets partagés ne correspondent pas. Abandon.")
-        exit(1)
+        return 1
 
     print(f"Secret partagé établi : {user.shared_secret}")
+    return user.shared_secret
 
-# Étape 4: Communication sécurisée
-def secure_communication(user, safe):
-    print("Étape 4: Communication sécurisée...")
-
+#Etape 4.1 : L'utilisateur envoie un message chiffré au coffre fort
+def send_message_to_safe(user):
     # Passer la clé de session par le KDF
-    shared_secret_kdf = sponge_hash(str(safe.shared_secret), 32)
+    shared_secret_kdf = sponge_hash(str(user.shared_secret), 32)
     # Convertir en octets et normaliser à la longueur correcte
     session_key = normalize_key(shared_secret_kdf)
             
@@ -78,17 +78,32 @@ def secure_communication(user, safe):
 
     print(f"L'utilisateur envoie un message chiffré : {encrypted_message}")
     print(f"L'utilisateur envoie un HMAC : {mac}")
+    return encrypted_message, mac
 
-     # Le coffre fort déchiffre et vérifie le HMAC
+#Etape 4.2 : Le coffre fort déchiffre et vérifie le HMAC
+def receive_message_from_user(safe, encrypted_message, mac):
+    # Passer la clé de session par le KDF
+    shared_secret_kdf = sponge_hash(str(safe.shared_secret), 32)
+    # Convertir en octets et normaliser à la longueur correcte
+    session_key = normalize_key(shared_secret_kdf)
+
+    # Le coffre fort déchiffre et vérifie le HMAC
     decrypted_message = decode_text(encrypted_message, session_key)
     safe_mac = hmac(session_key, decrypted_message.encode('utf-8'))
 
     if safe_mac != mac:
         print("Échec de la vérification du HMAC au coffre fort. Communication compromise.")
-        exit(1)
+        return 1
 
     print(f"Le coffre fort a reçu le message : {decrypted_message}")
+    return decrypted_message
 
+#Etape 4.3 : Le coffre fort envoie un message chiffré à l'utilisateur
+def send_message_to_user(safe):
+    # Passer la clé de session par le KDF
+    shared_secret_kdf = sponge_hash(str(safe.shared_secret), 32)
+    # Convertir en octets et normaliser à la longueur correcte
+    session_key = normalize_key(shared_secret_kdf)
     # Simuler un message du coffre fort à l'utilisateur
     safe_message = "Bonjour, Utilisateur!"
     encrypted_safe_message = encode_text(safe_message, session_key)
@@ -96,6 +111,14 @@ def secure_communication(user, safe):
 
     print(f"Le coffre fort envoie un message chiffré : {encrypted_safe_message}")
     print(f"Le coffre fort envoie un HMAC : {safe_mac}")
+    return encrypted_safe_message, safe_mac
+
+#Etape 4.4 : L'utilisateur déchiffre et vérifie le HMAC
+def receive_message_from_safe(user, encrypted_safe_message, safe_mac):
+    # Passer la clé de session par le KDF
+    shared_secret_kdf = sponge_hash(str(user.shared_secret), 32)
+    # Convertir en octets et normaliser à la longueur correcte
+    session_key = normalize_key(shared_secret_kdf)
 
     # L'utilisateur déchiffre et vérifie le HMAC
     decrypted_safe_message = decode_text(encrypted_safe_message, session_key)
@@ -106,6 +129,20 @@ def secure_communication(user, safe):
         exit(1)
 
     print(f"L'utilisateur a reçu le message : {decrypted_safe_message}")
+    print("Fin de la communication sécurisée.")
+    return decrypted_safe_message
+
+# Étape 4: Communication sécurisée
+def secure_communication(user, safe):
+    print("Étape 4: Communication sécurisée...")
+    # 1. L'utilisateur envoie un message chiffré au coffre fort
+    encrypted_message, mac = send_message_to_safe(user)
+    # 2. Le coffre fort déchiffre et vérifie le HMAC
+    decrypted_message = receive_message_from_user(safe, encrypted_message, mac)
+    # 3. Le coffre fort envoie un message chiffré à l'utilisateur
+    encrypted_safe_message, safe_mac = send_message_to_user(safe)
+    # 4. L'utilisateur déchiffre et vérifie le HMAC
+    receive_message_from_safe(user, encrypted_safe_message, safe_mac)
 
 # Simulation principale
 if __name__ == "__main__":

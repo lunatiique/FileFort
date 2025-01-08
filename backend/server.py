@@ -1,13 +1,16 @@
 import os
 import io
 from datetime import datetime
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 from bitarray import bitarray
 from classes.User import User
 from cobra.cobra import generate_key_128, encode_text, decode_text
 from rsaEncrypt import encrypt_file_block, decrypt_file_block
 from classes.Keys import Keys
+from classes.CoffreFort import CoffreFort
+from classes.CA import CA
+from simulateCommunication import verify_safe_certificate, authenticate_user_to_safe, perform_key_exchange, send_message_to_safe, receive_message_from_user, send_message_to_user, receive_message_from_safe
 
 #
 def encode_file(public_key, request):
@@ -70,9 +73,8 @@ def send_file_back(file_name, user, private_key):
     return decrypted_data
 
 
-
 app = Flask(__name__)
-CORS(app,expose_headers=["PrivateKey"])  # Allow cross-origin requests from the React frontend
+CORS(app)  # Allow cross-origin requests from the React frontend
 
 UPLOAD_FOLDER = "../users/"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Ensure upload folder exists
@@ -274,6 +276,58 @@ def delete_file(file_name):
             return jsonify({"error": f"Failed to delete file: {str(e)}"}), 500
     else:
         return jsonify({"error": "File not found"}), 404
+
+
+@app.route('/api/simulation', methods=['GET'])
+def simulate_communication():
+    def event_stream():
+        # Initialiser CA, Utilisateur et Coffre Fort
+        ca = CA()
+        user = User()
+        private_key = Keys()
+        private_key.read_key("../users/luna/luna_private_key.pem")
+        user.login("luna", "blabla13", private_key)
+        safe = CoffreFort()
+        # Étape 1: Vérifier le certificat du coffre fort
+        yield f"data: Etape 1 : Vérification du certificat du coffre fort...\n\n"
+        verify_safe_certificate(ca)
+        yield f"data: Certificat du coffre fort vérifié.\n\n"
+        # Étape 2: Authentifier l'utilisateur auprès du coffre fort
+        yield f"data: Etape 2 : Authentification de l'utilisateur auprès du coffre fort...(Guillou-Quisquater)\n\n"
+        authenticate_user_to_safe(user, safe)
+        yield f"data: Utilisateur authentifié auprès du coffre fort.\n\n"
+        # Étape 3: Échange de clés
+        yield f"data: Etape 3 : Echange de clés...(Diffie-Hellman)\n\n"
+        key = perform_key_exchange(user, safe)
+        if key == 1:
+            yield f"data: Échec de l'échange de clés : les secrets partagés ne correspondent pas. Abandon.\n\n"
+            return
+        yield f"data: Secret partagé établi : {key}.\n\n"
+        # Étape 4: Communication sécurisée
+        yield f"data: Etape 4 : Communication sécurisée...(COBRA)\n\n"
+        encrypted, hmac = send_message_to_safe(user)
+        yield f"data: L'utilisateur envoie un message au coffre-fort.\n\n"
+        yield f"data: Message chiffré : {encrypted}.\n\n"
+        yield f"data: HMAC : {hmac}.\n\n"
+        decrypted = receive_message_from_user(safe, encrypted, hmac)
+        yield f"data: Le coffre-fort reçoit le message de l'utilisateur.\n\n"
+        if decrypted == 1:
+            yield f"data: Échec de la vérification du HMAC : la communication est compromise.\n\n"
+            return
+        yield f"data: Message reçu par le coffre fort : {decrypted}.\n\n"
+        encrypted, hmac = send_message_to_user(safe)
+        yield f"data: Le coffre-fort envoie un message à l'utilisateur.\n\n"
+        yield f"data: Message chiffré : {encrypted}.\n\n"
+        yield f"data: HMAC : {hmac}.\n\n"
+        decrypted = receive_message_from_safe(user, encrypted, hmac)
+        yield f"data: L'utilisateur reçoit le message du coffre fort.\n\n"
+        if decrypted == 1:
+            yield f"data: Échec de la vérification du HMAC : la communication est compromise.\n\n"
+            return
+        yield f"data: Message reçu par l'utilisateur : {decrypted}.\n\n"
+        yield f"data: Fin de la communication sécurisée.\n\n"
+
+    return Response(event_stream(), content_type='text/event-stream')
 
 
 if __name__ == '__main__':
