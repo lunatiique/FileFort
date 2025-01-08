@@ -102,6 +102,8 @@ def api_create_user():
         user = User()
         keys = Keys()
         keys.d, keys.n = user.create(name, password)
+        # Sauvegarder la clé privée
+        private_key = keys.write_private_key_format()
         return jsonify({"message": "User created successfully!", "private_key_pem": private_key}), 201
     except Exception as e:
         if 'WinError 183' in str(e):
