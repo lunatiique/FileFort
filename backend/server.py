@@ -12,9 +12,9 @@ from classes.CoffreFort import CoffreFort
 from classes.CA import CA
 from simulateCommunication import verify_safe_certificate, authenticate_user_to_safe, perform_key_exchange, send_message_to_safe, receive_message_from_user, send_message_to_user, receive_message_from_safe
 
-#
+# Fonction pour encoder un fichier avec une clé publique
 def encode_file(public_key, request):
-    # Validate request data
+    # Valider les données de la requête
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
     if "name" not in request.form:
@@ -26,19 +26,19 @@ def encode_file(public_key, request):
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    # Define user directory
+    # Définir le répertoire de l'utilisateur
     user_path = os.path.join(app.config["UPLOAD_FOLDER"], name, "data")
     os.makedirs(user_path, exist_ok=True)
     
-    # Validate public key
+    # Valider la clé publique
     try:
         e, n = public_key
     except ValueError:
         return jsonify({"error": "Invalid public key format"}), 400
 
-    # Read and encrypt the file
+    # Lire et chiffrer le fichier
     encrypted_file_base64 = encrypt_file_block(file, n, e)
-    # Save the encrypted data
+    # Sauvegarder les données chiffrées
     encrypted_file_path = os.path.join(user_path, f"{file.filename}")
 
     with open(encrypted_file_path, "w") as f:
@@ -46,22 +46,23 @@ def encode_file(public_key, request):
 
     return jsonify({"message": "File uploaded and encrypted successfully!"}), 201
 
+# Fonction pour envoyer un fichier déchiffré à l'utilisateur
 def send_file_back(file_name, user, private_key):
-    # Define user directory
+    # Définir le répertoire de l'utilisateur
     user_path = os.path.join(app.config["UPLOAD_FOLDER"], user, "data")
     
-    # Validate private key
+    # Valider la clé privée
     try:
         k, n = private_key
     except ValueError:
         raise ValueError("Invalid private key format")
     
-    # Read the encrypted file
+    # Lire le fichier chiffré
     encrypted_file_path = os.path.join(user_path, f"{file_name}")
     if not os.path.exists(encrypted_file_path):
         raise FileNotFoundError(f"Encrypted file {file_name} not found")
     
-    # Open the file
+    # Ouvrir le fichier
     with open(encrypted_file_path, "r") as file:
         try:
             decrypted_data = decrypt_file_block(file, n, k)
@@ -69,60 +70,61 @@ def send_file_back(file_name, user, private_key):
             print(f"Decryption failed: {e}")
             raise
 
-    # Return decrypted data
+    # Retourner les données déchiffrées
     return decrypted_data
 
-
 app = Flask(__name__)
-CORS(app)  # Allow cross-origin requests from the React frontend
+CORS(app)  # Autoriser les requêtes cross-origin depuis le frontend React
 
 UPLOAD_FOLDER = "../users/"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Ensure upload folder exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # S'assurer que le dossier de téléchargement existe
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+# Route pour créer un utilisateur
 @app.route('/api/create_user', methods=['POST'])
 def api_create_user():
-    # Extract data from the request
+    # Extraire les données de la requête
     data = request.get_json()
     name = data.get('name')
     password = data.get('password')
 
-    # Validate input
+    # Valider les entrées
     if not name or not password:
         return jsonify({"error": "Name and password are required"}), 400
-    # Check if the name is already taken
+    # Vérifier si le nom est déjà pris
     if name in os.listdir('../users'):
         return jsonify({"error": "Username already exists"}), 400
-    # Check if the password is at least 8 characters long and contains a digit
+    # Vérifier si le mot de passe a au moins 8 caractères et contient un chiffre
     if len(password) < 8 or not any(char.isdigit() for char in password):
         return jsonify({"error": "Password must be at least 8 characters long and contain a digit"}), 400
     try:
-        # Call the create_user function
+        # Appeler la fonction create_user
         user = User()
         keys = Keys()
-        keys.d,keys.n = user.create(name, password)
+        keys.d, keys.n = user.create(name, password)
         return jsonify({"message": "User created successfully!", "private_key_pem": private_key}), 201
     except Exception as e:
         if 'WinError 183' in str(e):
             return jsonify({"error": "Username already exists"}), 400
         return jsonify({"error": str(e)}), 500
-    
+
+# Route pour connecter un utilisateur
 @app.route('/api/login_user', methods=['POST'])
 def api_login_user():
-    # Extract data from the request
+    # Extraire les données de la requête
     data = request.get_json()
     name = data.get('name')
     password = data.get('password')
-    privateKey_encoded = data.get('privateKey') # Pour simplifier le projet, normalement les calculs de ZPK se font côté client
-    # Validate input
+    privateKey_encoded = data.get('privateKey')  # Pour simplifier le projet, normalement les calculs de ZPK se font côté client
+    # Valider les entrées
     if not name or not password:
         return jsonify({"error": "Name and password are required"}), 400
 
     try:
-        # Decode the private key
+        # Décoder la clé privée
         privateKey = Keys()
         privateKey.decode_key(privateKey_encoded)
-        # Call the login_user function
+        # Appeler la fonction login_user
         user = User()
         success = user.login(name, password, privateKey)
         if success:
@@ -132,69 +134,74 @@ def api_login_user():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# Route pour générer une clé de 128 bits
 @app.route('/api/generate_key_128', methods=['GET'])
 def api_generate_key_128():
     try:
-        # Call the generate_key_128 function
+        # Appeler la fonction generate_key_128
         key = generate_key_128()
-        # Convert bitarray to hex string
+        # Convertir bitarray en chaîne hexadécimale
         key = key.tobytes().hex()
         return jsonify({"key": key}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# Route pour encoder un texte
 @app.route('/api/encode_text', methods=['POST'])
 def api_encode_text():
-    # Extract data from the request
+    # Extraire les données de la requête
     data = request.get_json()
     text = data.get('text')
     key = data.get('key')
-    # Validate input
+    # Valider les entrées
     if not text and not key:
         return jsonify({"error": "Text and key are required"}), 400
-    # Convert hex string to bitarray
+    # Convertir la chaîne hexadécimale en bitarray
     bin_key = bitarray()
     bin_key.frombytes(bytes.fromhex(key))
-    # Check key length (128 bits)
+    # Vérifier la longueur de la clé (128 bits)
     if len(bin_key) != 128:
         return jsonify({"error": "Invalid key length"}), 400
     try:
-        # Call the encode_text function
+        # Appeler la fonction encode_text
         encoded_text = encode_text(text, bin_key)
         return jsonify({"encoded_text": encoded_text}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
+# Route pour décoder un texte
 @app.route('/api/decode_text', methods=['POST'])
 def api_decode_text():
-    # Extract data from the request
+    # Extraire les données de la requête
     data = request.get_json()
     text = data.get('text')
     key = data.get('key')
-    # Validate input
+    # Valider les entrées
     if not text and not key:
         return jsonify({"error": "Text and key are required"}), 400
-    # Convert hex string to bitarray
+    # Convertir la chaîne hexadécimale en bitarray
     bin_key = bitarray()
     bin_key.frombytes(bytes.fromhex(key))
-    # Check key length (128 bits)
+    # Vérifier la longueur de la clé (128 bits)
     if len(bin_key) != 128:
         return jsonify({"error": "Invalid key length"}), 400
     try:
-        # Call the decode_text function
+        # Appeler la fonction decode_text
         decoded_text = decode_text(text, bin_key)
         return jsonify({"decoded_text": decoded_text}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# Route pour télécharger un fichier
 @app.route("/api/upload", methods=["POST"])
 def upload_file():
-    # read the public_key from the user logged in
+    # Lire la clé publique de l'utilisateur connecté
     keys = Keys()
     keys.read_key(f"../users/{request.form['name']}/public_key.pem")
     result = encode_file((keys.e, keys.n), request)
     return result
 
+# Route pour obtenir la liste des fichiers d'un utilisateur
 @app.route('/api/files', methods=['GET'])
 def get_files():
     user_name = request.headers.get("Authorization")    
@@ -205,19 +212,19 @@ def get_files():
     
     files = []
     
-    # Iterate through the files in the directory
+    # Itérer à travers les fichiers dans le répertoire
     for file_name in os.listdir(user_path):
         file_path = os.path.join(user_path, file_name)
         
-        # Ensure that we only include files (skip directories)
+        # S'assurer que nous incluons uniquement les fichiers (ignorer les répertoires)
         if os.path.isfile(file_path):
-            # Get the creation time (or last modification time)
-            file_creation_time = os.path.getctime(file_path)  # Use getmtime if preferred
+            # Obtenir le temps de création (ou le dernier temps de modification)
+            file_creation_time = os.path.getctime(file_path)  # Utiliser getmtime si préféré
             
-            # Convert the timestamp to a readable date string
+            # Convertir le timestamp en chaîne de date lisible
             file_date_added = datetime.fromtimestamp(file_creation_time).isoformat()
             
-            # Append the file details to the list
+            # Ajouter les détails du fichier à la liste
             files.append({
                 "name": file_name,
                 "dateAdded": file_date_added
@@ -225,10 +232,10 @@ def get_files():
     
     return jsonify({"files": files}), 200
 
-
+# Route pour télécharger un fichier déchiffré
 @app.route('/api/files/<file_name>', methods=['GET'])
 def download_file(file_name):
-    # Get the 'Authorization' header and extract the username
+    # Obtenir l'en-tête 'Authorization' et extraire le nom d'utilisateur
     user_name = request.headers.get('Authorization')
     privateKey = request.args.get('privateKey')
     keys = Keys()
@@ -240,24 +247,24 @@ def download_file(file_name):
     if not keys.d:
         return jsonify({"error": "Valid private key is required"}), 400
     try:
-        # TODO : read the private key from the user logged in (ask him to give the file ? how can I do this ?)
+        # TODO : lire la clé privée de l'utilisateur connecté (lui demander de fournir le fichier ? comment puis-je faire cela ?)
         decrypted_file = send_file_back(file_name, user_name, (keys.d, keys.n))
         decrypted_file = decrypted_file.replace('\x00', '')
-        # Use io.BytesIO to create a file-like object in memory
+        # Utiliser io.BytesIO pour créer un objet fichier en mémoire
         file_stream = io.BytesIO(decrypted_file.encode('utf-8'))
-        file_stream.seek(0)  # Ensure the stream's pointer is at the beginning
+        file_stream.seek(0)  # S'assurer que le pointeur du flux est au début
 
-        # Send the in-memory file to the user
+        # Envoyer le fichier en mémoire à l'utilisateur
         return send_file(
             file_stream,
             as_attachment=True,
-            download_name=file_name,  # Suggests the file name for download
-            mimetype='application/octet-stream'  # Default binary MIME type
+            download_name=file_name,  # Suggérer le nom du fichier pour le téléchargement
+            mimetype='application/octet-stream'  # Type MIME binaire par défaut
         )
     except Exception as e:
         return jsonify({"error": f"Failed to process file: {str(e)}"}), 500
-    
 
+# Route pour supprimer un fichier
 @app.route('/api/files/<file_name>', methods=['DELETE'])
 def delete_file(file_name):
     user_name = request.headers.get("Authorization")
@@ -270,14 +277,14 @@ def delete_file(file_name):
     
     if os.path.exists(file_path):
         try:
-            os.remove(file_path)  # Remove the file
+            os.remove(file_path)  # Supprimer le fichier
             return jsonify({"message": "File deleted successfully"}), 200
         except Exception as e:
             return jsonify({"error": f"Failed to delete file: {str(e)}"}), 500
     else:
         return jsonify({"error": "File not found"}), 404
 
-
+# Route pour simuler une communication sécurisée
 @app.route('/api/simulation', methods=['GET'])
 def simulate_communication():
     def event_stream():
@@ -286,6 +293,7 @@ def simulate_communication():
         user = User()
         private_key = Keys()
         private_key.read_key("../users/luna/luna_private_key.pem")
+        # Pour simplifier le projet, on connecte l'utilisateur automatiquement (c'est une simulation)
         user.login("luna", "blabla13", private_key)
         safe = CoffreFort()
         # Étape 1: Vérifier le certificat du coffre fort
@@ -329,8 +337,7 @@ def simulate_communication():
 
     return Response(event_stream(), content_type='text/event-stream')
 
-
 if __name__ == '__main__':
-    # Run the app on port 5000
-    #Allow all origins for CORS, allow every computer to access the server
+    # Exécuter l'application sur le port 5000
+    # Autoriser toutes les origines pour CORS, permettre à chaque ordinateur d'accéder au serveur
     app.run(port=5000, host='0.0.0.0')
