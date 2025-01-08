@@ -199,6 +199,19 @@ class Keys:
         with open(f"{path}/{name}/verificator.pem", "w") as ver_file:
             ver_file.write(verificator_pem)
     
+    # Ecriture de la clé privée sous forme de fichier .PEM (afin que l'utilisateur puisse la télécharger et la stocker en lieu sûr)
+    def write_private_key_format(self):
+        priv_key_bytes = struct.pack(">I", len(int_to_bytes(self.d))) + int_to_bytes(self.d) + int_to_bytes(self.n)
+        priv_key_base64 = base64.encodebytes(priv_key_bytes).decode('ascii')
+        
+        private_pem = (
+            "-----BEGIN PRIVATE KEY-----\n" +
+            priv_key_base64 +
+            "-----END PRIVATE KEY-----\n"
+        )
+
+        return private_pem
+    
     # Lecture du vérificateur v à partir d'un fichier .PEM
     def read_verificator_from_file(self, path):
         # Ouvrir le fichier
