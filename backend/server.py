@@ -6,7 +6,7 @@ from flask_cors import CORS
 from bitarray import bitarray
 from classes.User import User
 from cobra.cobra import generate_key_128, encode_text, decode_text
-from rsaEncrypt import encrypt_file_block, decrypt_file_block
+from rsaEncrypt import encrypt_file_block, decrypt_file_block, encrypt_pgm, decrypt_pgm
 from classes.Keys import Keys
 from classes.CoffreFort import CoffreFort
 from classes.CA import CA
@@ -36,13 +36,23 @@ def encode_file(public_key, request):
     except ValueError:
         return jsonify({"error": "Invalid public key format"}), 400
 
-    # Lire et chiffrer le fichier
-    encrypted_file_base64 = encrypt_file_block(file, n, e)
     # Sauvegarder les données chiffrées
     encrypted_file_path = os.path.join(user_path, f"{file.filename}")
 
-    with open(encrypted_file_path, "w") as f:
-        f.write(encrypted_file_base64)
+    # Lire et chiffrer le fichier (selon le format)
+    if file.filename.endswith(".pgm"):
+        encrypted_file_base64 = encrypt_pgm(file, n, e)
+        with open(encrypted_file_path, "wb") as f:
+            f.write(encrypted_file_base64)
+    elif file.filename.endswith(".txt"):
+        encrypted_file_base64 = encrypt_file_block(file, n, e)
+        with open(encrypted_file_path, "w") as f:
+            f.write(encrypted_file_base64)
+    else:
+        return jsonify({"error": "Invalid file format"}), 400
+    
+
+    
 
     return jsonify({"message": "File uploaded and encrypted successfully!"}), 201
 
@@ -61,14 +71,25 @@ def send_file_back(file_name, user, private_key):
     encrypted_file_path = os.path.join(user_path, f"{file_name}")
     if not os.path.exists(encrypted_file_path):
         raise FileNotFoundError(f"Encrypted file {file_name} not found")
-    
+    if file_name.endswith(".pgm"):
+        # Ouvrir le fichier
+        with open(encrypted_file_path, "rb") as file:
+            try:
+                decrypted_data = decrypt_pgm(file, n, k)
+            except Exception as e:
+                print(f"Decryption failed: {e}")
+                raise
     # Ouvrir le fichier
-    with open(encrypted_file_path, "r") as file:
-        try:
-            decrypted_data = decrypt_file_block(file, n, k)
-        except Exception as e:
-            print(f"Decryption failed: {e}")
-            raise
+    elif file_name.endswith(".txt"):
+        with open(encrypted_file_path, "r") as file:
+            try:
+                decrypted_data = decrypt_file_block(file, n, k)
+                decrypted_data.replace('\x00', '')
+            except Exception as e:
+                print(f"Decryption failed: {e}")
+                raise
+    else:
+        raise ValueError("Invalid file format")
 
     # Retourner les données déchiffrées
     return decrypted_data
@@ -249,20 +270,33 @@ def download_file(file_name):
     if not keys.d:
         return jsonify({"error": "Valid private key is required"}), 400
     try:
-        # TODO : lire la clé privée de l'utilisateur connecté (lui demander de fournir le fichier ? comment puis-je faire cela ?)
         decrypted_file = send_file_back(file_name, user_name, (keys.d, keys.n))
-        decrypted_file = decrypted_file.replace('\x00', '')
-        # Utiliser io.BytesIO pour créer un objet fichier en mémoire
-        file_stream = io.BytesIO(decrypted_file.encode('utf-8'))
-        file_stream.seek(0)  # S'assurer que le pointeur du flux est au début
+        if file_name.endswith(".txt"):
+            # Utiliser io.BytesIO pour créer un objet fichier en mémoire
+            file_stream = io.BytesIO(decrypted_file.encode('utf-8'))
+            file_stream.seek(0)  # S'assurer que le pointeur du flux est au début
 
-        # Envoyer le fichier en mémoire à l'utilisateur
-        return send_file(
-            file_stream,
-            as_attachment=True,
-            download_name=file_name,  # Suggérer le nom du fichier pour le téléchargement
-            mimetype='application/octet-stream'  # Type MIME binaire par défaut
-        )
+            # Envoyer le fichier en mémoire à l'utilisateur
+            return send_file(
+                file_stream,
+                as_attachment=True,
+                download_name=file_name,  # Suggérer le nom du fichier pour le téléchargement
+                mimetype='application/octet-stream'  # Type MIME binaire par défaut
+            )
+        elif file_name.endswith(".pgm"):
+            # La variable decrypted_file est sous format binaire
+            file_stream = io.BytesIO(decrypted_file)    
+            file_stream.seek(0)  # S'assurer que le pointeur du flux est au début
+
+            # Envoyer le fichier en mémoire à l'utilisateur
+            return send_file(
+                file_stream,
+                as_attachment=True,
+                download_name=file_name,  # Suggérer le nom du fichier pour le téléchargement
+                mimetype='application/octet-stream'  # Type MIME binaire par défaut
+            )
+        else:
+            return jsonify({"error": "Invalid file format"}), 400
     except Exception as e:
         return jsonify({"error": f"Failed to process file: {str(e)}"}), 500
 
