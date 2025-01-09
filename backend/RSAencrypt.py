@@ -76,6 +76,62 @@ def decrypt_file_block(file, n, d):
     decrypted_data = decrypt_message_blockwise(encrypted_blocks, n, d, block_size)
     return decrypted_data
 
+# Chiffrer un fichier PGM en utilisant RSA avec la clé publique (n, e)
+def encrypt_pgm(file, n, e):
+    # Lire le fichier PGM en binaire
+    data = file.read()
+
+    # Séparer l'en-tête et les données de pixel
+    parts = data.split(b'\n', 3)
+    header = b'\n'.join(parts[:3]) + b'\n'
+    pixel_data = parts[3]
+
+    # Ajouter un padding pour que la taille des blocs soit correcte
+    block_size = (n.bit_length() // 8) - 1
+    padding_length = block_size - len(pixel_data) % block_size
+    if padding_length != block_size:
+        pixel_data += b'\x00' * padding_length  # Si la taille n'est pas un multiple de la taille du bloc, ajouter un padding
+
+    # Chiffrer les blocs de données de pixel (en utilisant la méthode RSA classique)
+    encrypted_blocks = []
+    for i in range(0, len(pixel_data), block_size):
+        block = pixel_data[i:i + block_size]
+        encrypted_blocks.append(pow(int.from_bytes(block, byteorder='big'), e, n))
+
+    # Convertir les blocs chiffrés en base64 pour le stockage
+    encrypted_data = base64.b64encode(bytes(str(encrypted_blocks), 'utf-8')).decode('utf-8')
+
+    # Retourner l'en-tête et les données chiffrées
+    return header + encrypted_data.encode('utf-8')
+
+# Déchiffrer un fichier PGM en utilisant RSA avec la clé privée (n, d)
+def decrypt_pgm(file, n, d):
+    # Lire le fichier PGM
+    data = file.read()
+
+    # Séparer l'en-tête et les données chiffrées
+    parts = data.split(b'\n', 3) 
+    header = b'\n'.join(parts[:3]) + b'\n'
+    encrypted_data_base64 = parts[3]
+
+    # Décoder le base64 pour obtenir les blocs chiffrés
+    encrypted_blocks = ast.literal_eval(base64.b64decode(encrypted_data_base64).decode())
+
+    # Déchiffrer les blocs de données de pixel (en utilisant la méthode RSA classique)
+    block_size = (n.bit_length() // 8) - 1
+    decrypted_pixel_data = bytearray()
+    for block in encrypted_blocks:
+        decrypted_value = pow(block, d, n)
+        decrypted_pixel_data.extend(decrypted_value.to_bytes(block_size, byteorder='big'))
+
+    # Supprimer le padding ajouté lors du chiffrement
+    decrypted_pixel_data = decrypted_pixel_data.rstrip(b'\x00')
+
+    # Retourner l'en-tête et les données déchiffrées
+    return header + decrypted_pixel_data
+
+
+
 # Exemple d'utilisation (pour test)
 if __name__ == '__main__':
     # Lire la clé depuis le fichier
@@ -83,15 +139,18 @@ if __name__ == '__main__':
     keys.read_key(f"../users/luna/luna_private_key.pem")
     keys.read_key(f"../users/luna/public_key.pem")
 
-    # Chiffrer un fichier
-    with open("test.txt", "rb") as file:  # Ouvrir en mode binaire
-        encrypted_message = encrypt_file_block(file, keys.n, keys.e)
+    # Chiffrer/ Déchiffrer une image pgm
+    with open("image.pgm", "rb") as file:
+        encrypted_pgm = encrypt_pgm(file, keys.n, keys.e)
 
-    # Enregistrer le fichier chiffré
-    with open("encrypted_file.txt", "w") as file:
-        file.write(encrypted_message)
+    # Sauvegarder l'image chiffrée
+    with open("encrypted_image.pgm", "wb") as file:
+        file.write(encrypted_pgm)
 
-    # Déchiffrer le fichier
-    with open("encrypted_file.txt", "r") as file:
-        decrypted_message = decrypt_file_block(file, keys.n, keys.d)
-    print("Decrypted message:", decrypted_message)
+    # Déchiffrer l'image chiffrée
+    with open("encrypted_image.pgm", "rb") as file:
+        decrypted_pgm = decrypt_pgm(file, keys.n, keys.d)
+
+    # Sauvegarder l'image déchiffrée
+    with open("decrypted_image.pgm", "wb") as file:
+        file.write(decrypted_pgm)
