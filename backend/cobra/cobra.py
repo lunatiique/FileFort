@@ -3,8 +3,8 @@ from multiprocessing import Pool
 import time
 from bitarray import bitarray
 
-from cobra.roundKeys import key_scheduling
 from cobra.s_boxes import sboxes_cobra, apply_sbox, inverse_sboxes_cobra
+from cobra.roundKeys import key_scheduling
 from mathFunctions import inv_mod
 from hash import sponge_hash
 
@@ -103,7 +103,7 @@ def apply_feistel_function(right_bloc, key, feistel_table):
     for z in z_blocs:
         z_bloc.extend(z)
     # Appliquer une permutation P au bloc
-    z_bloc = permutation_P(z_bloc)
+    z_bloc = permutation_P(z_bloc, key)
     # Diviser à nouveau le bloc en 8 blocs de 8 bits
     z_blocs = [z_bloc[i:i+8] for i in range(0, 64, 8)]
     # Générer des nombres pseudo-aléatoires à partir des blocs z
@@ -118,9 +118,13 @@ def apply_feistel_function(right_bloc, key, feistel_table):
     return output
 
 # Permutation P : On applique une permutation sur le bloc de 64 bits
-def permutation_P(bloc):
-    # define permutation vector (TODO)
-    P = [63, 31, 62, 30, 61, 29, 60, 28, 59, 27, 58, 26, 57, 25, 56, 24, 55, 23, 54, 22, 53, 21, 52, 20, 51, 19, 50, 18, 49, 17, 48, 16, 47, 15, 46, 14, 45, 13, 44, 12, 43, 11, 42, 10, 41, 9, 40, 8, 39, 7, 38, 6, 37, 5, 36, 4, 35, 3, 34, 2, 33, 1, 32, 0]
+def permutation_P(bloc, key):
+    # On met le seed du générateur de nombres pseudo-aléatoires à la valeur de la clé du tour
+    random.seed(int(key.to01(), 2))
+    # On génère un vecteur de permutation de 64 bits (valeurs de 0 à 63)
+    P = list(range(64))
+    # On génère pseudo-aléatoirement les valeurs du vecteur de permutation
+    random.shuffle(P)
     # Appliquer la permutation si le bloc est bien de 64 bits (sinon, soulever une erreur)
     if len(bloc) == 64:
         bloc = bitarray([bloc[i] for i in P])
@@ -428,10 +432,3 @@ if __name__ == "__main__":
     decoded_data = decode_text(test, key)
     print("Time to decode : ", time.time() - time1)
     print("Decoded data : ", decoded_data)    
-
-
-
-# TODO : définition du dernier tour
-# TODO : inverser substitution
-# TODO : inverser add_round_key
-# TODO : écrire fonction de décodage
