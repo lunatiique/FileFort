@@ -1,79 +1,62 @@
 import base64
 import ast
 from classes.Keys import Keys
+import os
 
-# Chiffrer un message en utilisant RSA avec la clé publique (n, e). C = M^e mod n
-def encrypt_message(message, n, e):
-    return [pow(char, e, n) for char in message]
-
-# Déchiffrer un message en utilisant RSA avec la clé privée (n, d). M = C^d mod n
-def decrypt_message(encrypted_message, n, d):
-    decrypted_chars = []
-    for char in encrypted_message:
-        decrypted_char = pow(char, d, n)
-        if decrypted_char < 0x110000:
-            decrypted_chars.append(chr(decrypted_char))
-        else:
-            raise ValueError(f"Decrypted value {decrypted_char} is out of range for chr()")
-    return ''.join(decrypted_chars)
-
-# Chiffrer un fichier en utilisant RSA avec la clé publique (n, e)
-def encrypt_file(file, n, e):
-    # Lire le fichier en binaire
-    data = file.read()
-    # Chiffrer les données binaires octet par octet
-    encrypted_data = [pow(byte, e, n) for byte in data]
-    # Convertir les données chiffrées en base64
-    encrypted_data_base64 = base64.b64encode(bytes(str(encrypted_data), 'utf-8')).decode('utf-8')
-    return encrypted_data_base64
-
-# Déchiffrer un fichier en utilisant RSA avec la clé privée (n, d)
-def decrypt_file(file, n, d):
-    # Lire le fichier
-    encrypted_data_base64 = file.read()
-    # Décoder le base64 pour obtenir les données chiffrées
-    encrypted_data = ast.literal_eval(base64.b64decode(encrypted_data_base64).decode('utf-8'))
-    # Déchiffrer le fichier
-    decrypted_data = decrypt_message(encrypted_data, n, d)
-    return decrypted_data
-
-# Chiffrer un message en utilisant RSA avec la clé publique (n, e) en divisant le message en blocs
-def encrypt_message_blockwise(message, n, e, block_size):
-    # Convertir le message en octets s'il s'agit d'une chaîne
+# Chiffrer un message en utilisant RSA avec padding aléatoire
+def encrypt_message_with_padding(message, n, e, block_size):
     if isinstance(message, str):
         message = message.encode()
-    # Diviser le message en blocs
-    blocks = [message[i:i + block_size] for i in range(0, len(message), block_size)]
-    encrypted_blocks = [pow(int.from_bytes(block, byteorder='big'), e, n) for block in blocks]
+
+    # Diviser le message en blocs de taille `block_size // 2`
+    blocks = [message[i:i + block_size // 2] for i in range(0, len(message), block_size // 2)]
+    padding_size = block_size // 2
+    padded_blocks = []
+
+    for block in blocks:
+        # Ajouter un padding aléatoire pour remplir le bloc
+        padding = os.urandom(padding_size)
+        padded_block = block + padding
+        padded_blocks.append(padded_block)
+    # Chiffrer les blocs avec padding
+    encrypted_blocks = [pow(int.from_bytes(block, byteorder='big'), e, n) for block in padded_blocks]
     return encrypted_blocks
 
-# Déchiffrer un message en utilisant RSA avec la clé privée (n, d) en divisant le message en blocs
-def decrypt_message_blockwise(encrypted_blocks, n, d, block_size):
+# Déchiffrer un message en utilisant RSA et enlever le padding aléatoire
+def decrypt_message_with_padding(encrypted_blocks, n, d, block_size):
     decrypted_message = bytearray()
+    padding_size = block_size // 2  # La moitié de la taille du bloc est utilisée pour le padding aléatoire
+
     for block in encrypted_blocks:
+        # Effectuer le déchiffrement RSA
         decrypted_block = pow(block, d, n)
-        decrypted_message.extend(decrypted_block.to_bytes(block_size, byteorder='big'))
+        # Convertir le bloc déchiffré en octets, en s'assurant qu'il a exactement block_size octets
+        block_bytes = decrypted_block.to_bytes(block_size, byteorder='big')
+        # Supprimer les "\x00" au début du bloc
+        block_bytes = block_bytes.lstrip(b'\x00')
+        # Extraire la partie du message original (en enlevant le padding aléatoire)
+        original_message_part = block_bytes[:-padding_size]
+        # Ajouter la partie du message original au résultat
+        decrypted_message.extend(original_message_part)
+
     return decrypted_message.decode()
 
-# Chiffrer un fichier en utilisant RSA avec la clé publique (n, e) en divisant le fichier en blocs
-def encrypt_file_block(file, n, e):
-    # Lire le fichier en binaire
+# Chiffrer un fichier en utilisant RSA avec padding aléatoire
+def encrypt_file_with_padding(file, n, e):
     data = file.read()
     block_size = (n.bit_length() // 8) - 1
-    encrypted_data = encrypt_message_blockwise(data, n, e, block_size)
-    # Encoder les données chiffrées en base64 pour le stockage
+    encrypted_data = encrypt_message_with_padding(data, n, e, block_size)
+    # Encoder les blocs chiffrés en base64 pour le stockage
     encrypted_data_base64 = base64.b64encode(str(encrypted_data).encode()).decode()
     return encrypted_data_base64
 
-# Déchiffrer un fichier en utilisant RSA avec la clé privée (n, d) en divisant le fichier en blocs
-def decrypt_file_block(file, n, d):
-    # Lire le fichier chiffré (encodé en base64)
+# Déchiffrer un fichier en utilisant RSA et enlever le padding aléatoire
+def decrypt_file_with_padding(file, n, d):
     encrypted_data_base64 = file.read()
     # Décoder le base64 pour obtenir les blocs chiffrés
     encrypted_blocks = ast.literal_eval(base64.b64decode(encrypted_data_base64).decode())
     block_size = (n.bit_length() // 8) - 1
-    # Déchiffrer les blocs
-    decrypted_data = decrypt_message_blockwise(encrypted_blocks, n, d, block_size)
+    decrypted_data = decrypt_message_with_padding(encrypted_blocks, n, d, block_size)
     return decrypted_data
 
 # Chiffrer un fichier PGM en utilisant RSA avec la clé publique (n, e)
@@ -130,8 +113,6 @@ def decrypt_pgm(file, n, d):
     # Retourner l'en-tête et les données déchiffrées
     return header + decrypted_pixel_data
 
-
-
 # Exemple d'utilisation (pour test)
 if __name__ == '__main__':
     # Lire la clé depuis le fichier
@@ -139,18 +120,15 @@ if __name__ == '__main__':
     keys.read_key(f"../users/luna/luna_private_key.pem")
     keys.read_key(f"../users/luna/public_key.pem")
 
-    # Chiffrer/ Déchiffrer une image pgm
-    with open("image.pgm", "rb") as file:
-        encrypted_pgm = encrypt_pgm(file, keys.n, keys.e)
+    # Chiffrer/ Déchiffrer un fichier .txt
+    with open("coucou.txt", "r") as file:
+        encrypted_data = encrypt_file_with_padding(file, keys.n, keys.e)
 
-    # Sauvegarder l'image chiffrée
-    with open("encrypted_image.pgm", "wb") as file:
-        file.write(encrypted_pgm)
+    with open("encrypted_coucou.txt", "w") as file:
+        file.write(encrypted_data)
 
-    # Déchiffrer l'image chiffrée
-    with open("encrypted_image.pgm", "rb") as file:
-        decrypted_pgm = decrypt_pgm(file, keys.n, keys.d)
+    with open("encrypted_coucou.txt", "r") as file:
+        decrypted_data = decrypt_file_with_padding(file, keys.n, keys.d)
+        print("texte lu : ",decrypted_data)
 
-    # Sauvegarder l'image déchiffrée
-    with open("decrypted_image.pgm", "wb") as file:
-        file.write(decrypted_pgm)
+

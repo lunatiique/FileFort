@@ -6,7 +6,7 @@ from flask_cors import CORS
 from bitarray import bitarray
 from classes.User import User
 from cobra.cobra import generate_key_128, encode_text, decode_text
-from rsaEncrypt import encrypt_file_block, decrypt_file_block, encrypt_pgm, decrypt_pgm
+from rsaEncrypt import encrypt_file_with_padding, decrypt_file_with_padding, encrypt_pgm, decrypt_pgm
 from classes.Keys import Keys
 from classes.CoffreFort import CoffreFort
 from classes.CA import CA
@@ -45,7 +45,7 @@ def encode_file(public_key, request):
         with open(encrypted_file_path, "wb") as f:
             f.write(encrypted_file_base64)
     elif file.filename.endswith(".txt"):
-        encrypted_file_base64 = encrypt_file_block(file, n, e)
+        encrypted_file_base64 = encrypt_file_with_padding(file, n, e)
         with open(encrypted_file_path, "w") as f:
             f.write(encrypted_file_base64)
     else:
@@ -83,7 +83,7 @@ def send_file_back(file_name, user, private_key):
     elif file_name.endswith(".txt"):
         with open(encrypted_file_path, "r") as file:
             try:
-                decrypted_data = decrypt_file_block(file, n, k)
+                decrypted_data = decrypt_file_with_padding(file, n, k)
                 decrypted_data.replace('\x00', '')
             except Exception as e:
                 print(f"Decryption failed: {e}")
