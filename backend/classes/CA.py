@@ -66,6 +66,9 @@ class CA:
         key_data = (self.keys.e, self.keys.n)
         # On convertit le contenu en JSON
         content_dump = json.dumps(content)
+        # On vérifie la date d'expiration du certificat
+        if time.time() > content["expiration"]:
+            return False
         return verify_signature(content_dump, signature, key_data)
 
     # Créer un certificat pour le coffre fort

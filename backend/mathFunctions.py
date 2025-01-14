@@ -14,7 +14,7 @@ def coprime(a):
         b = random.randint(1, a - 1)
     return b
 
-# Algorithme d'Euclide étendu pour trouver les coefficients de l'identité de Bézout
+# Algorithme d'Euclide étendu pour trouver les coefficients de l'identité de Bézout, jamais utilisé
 def bezout(a, b):
     if b == 0:
         return (1, 0)
@@ -80,7 +80,7 @@ def phi(a):
         result *= (i - 1) / i
     return int(result)
 
-# Algorithme d'exponentiation rapide pour calculer a^n modulo m
+# Algorithme d'exponentiation rapide pour calculer a^n modulo m, on a plutôt utilisé la fonction pow() de Python
 def exp(a, n, m):
     if n == 0:
         return 1
@@ -89,7 +89,7 @@ def exp(a, n, m):
     else:
         return a * exp(a, n - 1, m) % m
 
-# Algorithme d'exponentiation rapide pour trouver l'inverse de a modulo b en utilisant le théorème d'Euler
+# Algorithme d'exponentiation rapide pour trouver l'inverse de a modulo b en utilisant le théorème d'Euler, jamais utilisé
 def inv_mod_with_euler(a, b):
     if pgcd(a, b) != 1:
         return "Pas d'inverse"
@@ -104,6 +104,7 @@ def inv_mod_with_fermat(a, b):
 
 # Théorème des restes chinois pour trouver la solution d'un système de congruences
 # congruences est une liste de tuples (a, mod) où a est le reste et mod le module. ex : [(1,2),(2,3),(3,5)] signifie x=1 mod 2, x=2 mod 3 et x=3 mod 5
+# jamais utilisé
 def crt(congruences):
     N = 1
     for _, mod in congruences:
@@ -114,7 +115,7 @@ def crt(congruences):
         result += a * N_i * inv_mod_with_fermat(N_i, mod)
     return result % N
 
-# Test de primalité de Fermat pour vérifier si un nombre est premier
+# Test de primalité de Fermat pour vérifier si un nombre est premier, jamais utilisé
 def fermat(a):
     if a <= 1:
         return False

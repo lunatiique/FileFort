@@ -330,7 +330,11 @@ def simulate_communication():
         private_key = Keys()
         private_key.read_key("../users/luna/luna_private_key.pem")
         # Pour simplifier le projet, on connecte l'utilisateur automatiquement (c'est une simulation)
-        user.login("luna", "blabla13", private_key)
+        try :
+            user.login("luna", "blabla13", private_key)
+        except ValueError as e:
+            yield f"data: {str(e)}\n\n"
+            return
         safe = CoffreFort()
         # Étape 1: Vérifier le certificat du coffre fort
         yield f"data: Etape 1 : Vérification du certificat du coffre fort...\n\n"
